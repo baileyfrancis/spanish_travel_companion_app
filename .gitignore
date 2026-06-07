@@ -1,0 +1,2 @@
+# Licensed Read2Speak files are local-only and must not be published.
+data/read2speak/*.pdf

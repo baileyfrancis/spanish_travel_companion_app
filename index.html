@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#163c3a">
+  <meta name="description" content="A practical, offline-first Spanish learning companion for travel in Latin America.">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Spanish Travel">
+  <title>Spanish Travel Companion</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <a class="skip-link" href="#app-content">Skip to content</a>
+
+  <div class="app-shell">
+    <header class="app-header">
+      <div class="header-brand">
+        <div class="brand-mark" aria-hidden="true">ST</div>
+        <div>
+          <p class="eyebrow" id="header-period">Your learning plan</p>
+          <h1>Spanish Travel Companion</h1>
+        </div>
+      </div>
+      <div class="header-summary" id="header-summary"></div>
+    </header>
+
+    <div id="update-banner" class="update-banner" role="status" aria-live="polite" hidden>
+      <span>A new version is ready.</span>
+      <button class="button button-small button-light" id="refresh-app" type="button">Refresh app</button>
+    </div>
+
+    <main id="app-content" class="app-content" tabindex="-1">
+      <noscript>
+        <section class="card">
+          <h2>JavaScript is required</h2>
+          <p>This app stores progress on your device and needs JavaScript to work.</p>
+        </section>
+      </noscript>
+      <div id="view"></div>
+    </main>
+
+    <nav class="bottom-nav" aria-label="Main navigation">
+      <button class="nav-item active" type="button" data-tab="today" aria-current="page">
+        <span class="nav-icon" aria-hidden="true">✓</span><span>Today</span>
+      </button>
+      <button class="nav-item" type="button" data-tab="review">
+        <span class="nav-icon" aria-hidden="true">↻</span><span>Review</span>
+      </button>
+      <button class="nav-item" type="button" data-tab="speaking">
+        <span class="nav-icon" aria-hidden="true">◉</span><span>Speaking</span>
+      </button>
+      <button class="nav-item" type="button" data-tab="scenarios">
+        <span class="nav-icon" aria-hidden="true">◇</span><span>Scenarios</span>
+      </button>
+      <button class="nav-item" type="button" data-tab="more">
+        <span class="nav-icon" aria-hidden="true">•••</span><span>More</span>
+      </button>
+    </nav>
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  <div id="modal-root"></div>
+
+  <script src="core.js"></script>
+  <script src="data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
