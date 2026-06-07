@@ -9,7 +9,7 @@
       focus: "Pronunciation, greetings, identity, numbers, and high-frequency present-tense chunks.",
       studySpanishFocus: "vowels, consonants, stress, introductions, and regular present-tense verbs",
       listeningStage: 1,
-      scenarioIds: ["hostel", "meeting-locals"]
+      scenarioIds: ["hostel", "meeting-locals", "taxi-ride"]
     },
     {
       month: 2,
@@ -17,7 +17,7 @@
       focus: "Core verbs, questions, prices, directions, time, and repair phrases.",
       studySpanishFocus: "questions, numbers, time, ser and estar, tener, venir, and ir",
       listeningStage: 1,
-      scenarioIds: ["directions", "bus-ticket"]
+      scenarioIds: ["directions", "bus-ticket", "market-shopping"]
     },
     {
       month: 3,
@@ -25,7 +25,7 @@
       focus: "Ordering, dietary needs, booking details, check-in, and polite requests.",
       studySpanishFocus: "restaurant vocabulary, direct objects, gustar-like verbs, and polite requests",
       listeningStage: 2,
-      scenarioIds: ["food", "hostel"]
+      scenarioIds: ["food", "hostel", "checkout-charge"]
     },
     {
       month: 4,
@@ -33,7 +33,7 @@
       focus: "Transport, route questions, near future, simple past events, and practical problems.",
       studySpanishFocus: "public transport vocabulary, ir a, prepositions, and the preterite",
       listeningStage: 2,
-      scenarioIds: ["bus-ticket", "directions", "lost-item"]
+      scenarioIds: ["bus-ticket", "directions", "taxi-ride", "lost-item"]
     },
     {
       month: 5,
@@ -41,7 +41,7 @@
       focus: "Daily self-talk, phrase mining, short conversations, and explaining minor problems.",
       studySpanishFocus: "reflexive verbs, present progressive, object pronouns, and practical problem vocabulary",
       listeningStage: 3,
-      scenarioIds: ["booking-problem", "laundry", "sim-card"]
+      scenarioIds: ["booking-problem", "laundry", "sim-card", "money-atm"]
     },
     {
       month: 6,
@@ -49,7 +49,7 @@
       focus: "Routine, recent past, sequencing, longer answers, and conversational follow-ups.",
       studySpanishFocus: "preterite and imperfect forms, sequencing expressions, and everyday routines",
       listeningStage: 3,
-      scenarioIds: ["meeting-locals", "food"]
+      scenarioIds: ["meeting-locals", "food", "market-shopping"]
     },
     {
       month: 7,
@@ -57,7 +57,7 @@
       focus: "Past tense contrast, descriptions, preferences, and sustained five-minute conversations.",
       studySpanishFocus: "preterite versus imperfect, comparisons, descriptions, and preferences",
       listeningStage: 4,
-      scenarioIds: ["meeting-locals", "safety"]
+      scenarioIds: ["meeting-locals", "tour-booking", "safety"]
     },
     {
       month: 8,
@@ -65,7 +65,7 @@
       focus: "Reasons, comparisons, recommendations, uncertainty, and reacting naturally.",
       studySpanishFocus: "por and para, comparisons, the present subjunctive, and expressions of doubt",
       listeningStage: 4,
-      scenarioIds: ["meeting-locals", "food", "safety"]
+      scenarioIds: ["meeting-locals", "food", "tour-booking", "safety"]
     },
     {
       month: 9,
@@ -73,7 +73,7 @@
       focus: "Narrating journeys, mishaps, highlights, background detail, and intermediate listening.",
       studySpanishFocus: "past-tense contrast, relative pronouns, adverbs, and travel-story vocabulary",
       listeningStage: 5,
-      scenarioIds: ["lost-item", "booking-problem", "border"]
+      scenarioIds: ["lost-item", "baggage-claim", "booking-problem", "border"]
     },
     {
       month: 10,
@@ -81,7 +81,7 @@
       focus: "Health, logistics, money, safety, and complete scenario runs under light pressure.",
       studySpanishFocus: "formal commands, object pronouns with commands, health, injuries, and emergency vocabulary",
       listeningStage: 5,
-      scenarioIds: ["pharmacy", "sim-card", "safety"]
+      scenarioIds: ["pharmacy", "clinic-visit", "money-atm", "emergency-help", "safety"]
     },
     {
       month: 11,
@@ -89,7 +89,7 @@
       focus: "Regional listening, country-specific vocabulary, border travel, and full-day simulations.",
       studySpanishFocus: "future and conditional forms, travel vocabulary, idioms, and cultural notes",
       listeningStage: 6,
-      scenarioIds: ["border", "bus-ticket", "hostel"]
+      scenarioIds: ["airport-check-in", "flight-disruption", "border", "bus-ticket", "hostel"]
     },
     {
       month: 12,
@@ -97,7 +97,7 @@
       focus: "Fast retrieval, emergency language, weak-point repair, and final departure rehearsals.",
       studySpanishFocus: "commands, tense review, accentuation, and your weakest grammar or pronunciation topics",
       listeningStage: 6,
-      scenarioIds: ["pharmacy", "border", "lost-item", "booking-problem"]
+      scenarioIds: ["emergency-help", "clinic-visit", "flight-disruption", "border", "lost-item", "booking-problem"]
     }
   ];
 
@@ -383,6 +383,7 @@
       situation: "You arrive tired, confirm your booking, ask about breakfast and checkout, and solve one missing detail.",
       vocabulary: ["reserva", "habitación", "cama", "llave", "salida"],
       phrases: ["Tengo una reserva a nombre de…", "¿Está incluido el desayuno?", "¿A qué hora es la salida?"],
+      cues: ["Say the booking is under your name.", "Ask whether breakfast is included.", "Confirm the checkout time."],
       roleplay: "You are the guest. The receptionist cannot initially find your reservation."
     },
     {
@@ -392,6 +393,7 @@
       situation: "Buy a ticket for your next destination and clarify departure point, journey time, and connections.",
       vocabulary: ["boleto / billete", "terminal", "andén", "directo", "ida"],
       phrases: ["Un boleto para…, por favor.", "¿De dónde sale?", "¿Es directo?"],
+      cues: ["Ask for one ticket to your destination.", "Confirm where the bus leaves from.", "Ask whether the journey is direct."],
       roleplay: "The direct bus is full. Ask about the best alternative."
     },
     {
@@ -401,6 +403,7 @@
       situation: "Ask about a dish, order politely, explain a dietary need, and request the bill.",
       vocabulary: ["menú", "plato", "ingredientes", "sin", "cuenta"],
       phrases: ["¿Qué lleva este plato?", "Quisiera pedir…", "La cuenta, por favor."],
+      cues: ["Ask what a dish contains.", "Order what you want politely.", "Ask for the bill."],
       roleplay: "One ingredient is unavailable. Ask for a suitable alternative."
     },
     {
@@ -410,6 +413,7 @@
       situation: "Find a bus terminal and confirm whether you can walk there safely.",
       vocabulary: ["derecho", "esquina", "cuadra", "girar", "cerca"],
       phrases: ["¿Cómo llego a…?", "¿Está lejos?", "Entonces, sigo derecho y…"],
+      cues: ["Ask how to reach the terminal.", "Ask whether it is far away.", "Repeat the first direction back to confirm it."],
       roleplay: "The first explanation is too fast. Ask for repetition and confirm each step."
     },
     {
@@ -419,6 +423,7 @@
       situation: "Describe a minor symptom, say how long it has lasted, and understand basic medicine instructions.",
       vocabulary: ["dolor", "fiebre", "pastilla", "dosis", "receta"],
       phrases: ["Me duele…", "Desde hace dos días.", "¿Cada cuántas horas?"],
+      cues: ["Say what hurts.", "Explain how long the symptom has lasted.", "Ask how often to take the medicine."],
       roleplay: "The pharmacist asks about allergies and other medication."
     },
     {
@@ -428,6 +433,7 @@
       situation: "Buy a prepaid SIM, choose a data package, and make sure it is activated.",
       vocabulary: ["chip / tarjeta SIM", "datos", "prepago", "recarga", "señal"],
       phrases: ["Necesito una SIM con datos.", "¿Cuántos gigas incluye?", "¿Puede activarla?"],
+      cues: ["Ask for a SIM with mobile data.", "Ask how many gigabytes are included.", "Ask the staff member to activate it."],
       roleplay: "Your phone does not connect after installation. Explain what you see."
     },
     {
@@ -437,6 +443,7 @@
       situation: "Ask for a wash service, clarify price and collection time, and mention one delicate item.",
       vocabulary: ["lavar", "secar", "kilo", "delicado", "listo"],
       phrases: ["Quisiera lavar esta ropa.", "¿Cuánto cuesta por kilo?", "¿Cuándo estará lista?"],
+      cues: ["Say you would like these clothes washed.", "Ask for the price per kilogram.", "Ask when the clothes will be ready."],
       roleplay: "You need the clothes before an early departure tomorrow."
     },
     {
@@ -446,6 +453,7 @@
       situation: "Answer routine immigration questions about purpose, length of stay, route, and accommodation.",
       vocabulary: ["turismo", "estadía", "salida", "alojamiento", "pasaporte"],
       phrases: ["Estoy aquí por turismo.", "Voy a quedarme…", "Después voy a viajar a…"],
+      cues: ["Explain that you are visiting as a tourist.", "Say how long you will stay.", "Describe where you will travel next."],
       roleplay: "The officer asks for proof of onward travel and your first address."
     },
     {
@@ -455,6 +463,7 @@
       situation: "Ask trusted local staff about transport, neighbourhoods, and walking after dark.",
       vocabulary: ["seguro", "evitar", "barrio", "de noche", "taxi"],
       phrases: ["¿Es seguro caminar por aquí?", "¿Qué zona debo evitar?", "¿Cuál es la opción más segura?"],
+      cues: ["Ask whether it is safe to walk nearby.", "Ask which area you should avoid.", "Ask for the safest option."],
       roleplay: "Your original route is not recommended. Ask for a practical alternative."
     },
     {
@@ -464,6 +473,7 @@
       situation: "Introduce yourself, explain your trip, ask for recommendations, and keep the exchange moving.",
       vocabulary: ["viaje", "ruta", "recomendar", "conocer", "quedarse"],
       phrases: ["Estoy viajando por…", "¿Qué me recomienda?", "¿Y usted / tú?"],
+      cues: ["Explain where you are travelling.", "Ask for a recommendation.", "Turn the conversation back to the other person."],
       roleplay: "You meet someone at a café who is curious about your route."
     },
     {
@@ -473,6 +483,7 @@
       situation: "Your booking details do not match what you paid for. Explain calmly and request a solution.",
       vocabulary: ["confirmación", "pago", "cancelado", "disponible", "solución"],
       phrases: ["Hay un problema con mi reserva.", "Aquí está la confirmación.", "¿Qué solución hay?"],
+      cues: ["State that there is a problem with the booking.", "Show or refer to your confirmation.", "Ask what solution is available."],
       roleplay: "The room or ticket type you booked is unavailable."
     },
     {
@@ -482,7 +493,108 @@
       situation: "Report a lost phone, bag, or document and explain where you last had it.",
       vocabulary: ["perder", "mochila", "documento", "última vez", "encontrar"],
       phrases: ["He perdido mi…", "La última vez que lo vi fue…", "¿Hay objetos perdidos?"],
+      cues: ["Say which item you have lost.", "Explain where you last saw it.", "Ask whether there is a lost-property desk."],
       roleplay: "Staff ask you to describe the item and reconstruct your route."
+    },
+    {
+      id: "airport-check-in",
+      title: "Airport check-in",
+      category: "Airport",
+      situation: "Check in for a flight, confirm your seat and baggage allowance, and find the correct departure gate.",
+      vocabulary: ["mostrador", "equipaje", "asiento", "tarjeta de embarque", "puerta"],
+      phrases: ["Quisiera facturar esta maleta.", "¿Está incluido el equipaje?", "¿De qué puerta sale el vuelo?"],
+      cues: ["Say you would like to check this bag.", "Confirm whether baggage is included.", "Ask which gate the flight leaves from."],
+      roleplay: "Your carry-on is over the allowed weight. Ask about your options and the extra cost."
+    },
+    {
+      id: "flight-disruption",
+      title: "Flight delay or cancellation",
+      category: "Airport",
+      situation: "Your flight is delayed or cancelled. Confirm the new plan, protect your connection, and ask what assistance is available.",
+      vocabulary: ["retrasado", "cancelado", "conexión", "reubicar", "alojamiento"],
+      phrases: ["Mi vuelo está cancelado.", "Tengo una conexión en…", "¿Puede reubicarme en otro vuelo?"],
+      cues: ["State that your flight has been cancelled.", "Explain that you have a connecting flight.", "Ask to be moved to another flight."],
+      roleplay: "The next direct flight is tomorrow. Ask about an indirect route and whether accommodation or meals are provided."
+    },
+    {
+      id: "baggage-claim",
+      title: "Missing baggage",
+      category: "Airport",
+      situation: "Your checked bag does not arrive. Report it, describe it clearly, and arrange delivery or collection.",
+      vocabulary: ["equipaje", "cinta", "etiqueta", "reclamo", "entregar"],
+      phrases: ["Mi maleta no llegó.", "Es una mochila grande de color…", "¿Cuándo me la pueden entregar?"],
+      cues: ["Report that your bag did not arrive.", "Describe its size and colour.", "Ask when it can be delivered."],
+      roleplay: "You are leaving the city tomorrow morning. Give your next address and ask how to track the report."
+    },
+    {
+      id: "taxi-ride",
+      title: "Taking a taxi",
+      category: "Transport",
+      situation: "Confirm the destination and approximate fare, follow the route, and pay without confusion.",
+      vocabulary: ["dirección", "taxímetro", "tarifa", "efectivo", "recibo"],
+      phrases: ["¿Me puede llevar a esta dirección?", "¿Puede poner el taxímetro?", "¿Me da un recibo, por favor?"],
+      cues: ["Ask the driver to take you to an address.", "Ask for the meter to be used.", "Request a receipt."],
+      roleplay: "The driver suggests a fixed price that seems high. Ask for the normal fare and agree on a clear option before leaving."
+    },
+    {
+      id: "money-atm",
+      title: "Cash and ATM problem",
+      category: "Money",
+      situation: "Withdraw cash, understand fees, and ask for help when a card or machine does not behave as expected.",
+      vocabulary: ["cajero automático", "retiro", "comisión", "tarjeta", "efectivo"],
+      phrases: ["Quisiera retirar efectivo.", "¿Cuánto cobra de comisión?", "El cajero retuvo mi tarjeta."],
+      cues: ["Say you would like to withdraw cash.", "Ask how much the fee is.", "Explain that the ATM kept your card."],
+      roleplay: "The machine charged your account but gave you no cash. Explain what happened and ask for a reference number."
+    },
+    {
+      id: "market-shopping",
+      title: "Shopping at a market",
+      category: "Shopping",
+      situation: "Ask about an item, understand the price and quantity, and complete a friendly purchase.",
+      vocabulary: ["puesto", "precio", "talla", "medio kilo", "cambio"],
+      phrases: ["¿Cuánto cuesta esto?", "¿Tiene otra talla?", "Me llevo dos, por favor."],
+      cues: ["Ask how much an item costs.", "Ask whether another size is available.", "Say that you will take two."],
+      roleplay: "You only have a large banknote. Confirm whether the seller has change or can accept another payment method."
+    },
+    {
+      id: "clinic-visit",
+      title: "Doctor or clinic visit",
+      category: "Health",
+      situation: "Arrange a consultation, describe symptoms and relevant history, and clarify the next steps.",
+      vocabulary: ["consulta", "síntoma", "alergia", "seguro", "análisis"],
+      phrases: ["Necesito ver a un médico.", "Tengo estos síntomas desde…", "Soy alérgico / alérgica a…"],
+      cues: ["Say that you need to see a doctor.", "Explain your symptoms and when they began.", "Mention a relevant allergy."],
+      roleplay: "The clinician recommends a test and medication. Ask what each is for, what it costs, and when to seek further help."
+    },
+    {
+      id: "emergency-help",
+      title: "Getting urgent help",
+      category: "Emergency",
+      situation: "Get immediate help, give a precise location, and explain clearly who is at risk and what happened.",
+      vocabulary: ["emergencia", "ambulancia", "policía", "herido", "ubicación"],
+      phrases: ["Necesito ayuda de inmediato.", "Envíe una ambulancia, por favor.", "Estamos en esta dirección…"],
+      cues: ["Say that you need help immediately.", "Ask for an ambulance.", "Give your exact location."],
+      roleplay: "The operator cannot see your location. Describe a nearby landmark, answer who is injured, and stay on the line."
+    },
+    {
+      id: "tour-booking",
+      title: "Booking a tour or activity",
+      category: "Activities",
+      situation: "Choose an activity, check what is included and required, and confirm the meeting arrangements.",
+      vocabulary: ["excursión", "guía", "incluido", "punto de encuentro", "cancelar"],
+      phrases: ["Quisiera reservar la excursión de…", "¿Qué está incluido?", "¿Dónde es el punto de encuentro?"],
+      cues: ["Ask to book a particular excursion.", "Ask what the price includes.", "Confirm the meeting point."],
+      roleplay: "The weather may affect the activity. Ask about difficulty, equipment, cancellation, and refund arrangements."
+    },
+    {
+      id: "checkout-charge",
+      title: "Checking out and questioning a charge",
+      category: "Accommodation",
+      situation: "Check out, review the bill, question an unfamiliar charge, and store luggage before departure.",
+      vocabulary: ["factura", "cargo", "depósito", "equipaje", "devolver"],
+      phrases: ["Quisiera hacer el check-out.", "No reconozco este cargo.", "¿Puedo dejar el equipaje aquí?"],
+      cues: ["Say that you would like to check out.", "Question a charge you do not recognise.", "Ask to leave your luggage temporarily."],
+      roleplay: "A deposit has not been returned and staff say it may take several days. Ask for written confirmation and a receipt."
     }
   ];
 

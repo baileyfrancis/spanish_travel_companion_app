@@ -262,6 +262,38 @@
           if (!categories.has(category)) throw new Error(`Missing ${category} phrases`);
         });
     });
+    test("Every travel scenario includes active-recall cues", () => {
+      if (frame.contentWindow.APP_DATA.scenarios.length < 22) {
+        throw new Error("Expected at least 22 practical travel scenarios");
+      }
+      frame.contentWindow.APP_DATA.scenarios.forEach((scenario) => {
+        if (!Array.isArray(scenario.cues) || scenario.cues.length < 3) {
+          throw new Error(`${scenario.title} is missing recall cues`);
+        }
+      });
+    });
+    test("Scenario catalogue covers common travel pressure points", () => {
+      const scenarioIds = new Set(frame.contentWindow.APP_DATA.scenarios.map((scenario) => scenario.id));
+      [
+        "airport-check-in",
+        "flight-disruption",
+        "baggage-claim",
+        "taxi-ride",
+        "money-atm",
+        "market-shopping",
+        "clinic-visit",
+        "emergency-help",
+        "tour-booking",
+        "checkout-charge"
+      ].forEach((id) => {
+        if (!scenarioIds.has(id)) throw new Error(`Missing ${id} scenario`);
+      });
+      frame.contentWindow.APP_DATA.phases.forEach((phase) => {
+        phase.scenarioIds.forEach((id) => {
+          if (!scenarioIds.has(id)) throw new Error(`Month ${phase.month} references missing scenario ${id}`);
+        });
+      });
+    });
 
     const promptText = appDocument.querySelector(".phrase-prompt").textContent.trim();
     const reviewedCard = saved.deck.find((card) => card.english === promptText);
@@ -332,6 +364,41 @@
       const summary = appDocument.querySelector(".review-summary").textContent;
       if (!summary.includes("1 recalled") || !summary.includes("1 needed another attempt")) {
         throw new Error(`Unexpected review summary: ${summary}`);
+      }
+    });
+
+    frame.contentWindow.location.hash = "scenarios";
+    await waitFor(() => appDocument.querySelector("#view-title")?.textContent === "Travel scenarios");
+    test("Scenario recommendations explain the next rehearsal", () => {
+      const recommendation = appDocument.querySelector(".card-accent");
+      if (!recommendation?.textContent.includes("untested") || !recommendation.querySelector('[data-action="open-scenario"]')) {
+        throw new Error("Expected an actionable recommendation for an untested scenario");
+      }
+    });
+    appDocument.querySelector('[data-action="open-scenario"]').click();
+    await waitFor(() => appDocument.querySelector("#scenario-form"));
+    test("Scenario practice starts with recall before revealing Spanish", () => {
+      equal(appDocument.querySelectorAll(".scenario-cues li").length, 3);
+      if (appDocument.querySelector(".scenario-support").open) {
+        throw new Error("Phrase support should begin collapsed");
+      }
+      if (!appDocument.querySelector(".scenario-round-challenge")?.textContent.includes("complication")) {
+        throw new Error("Expected a second-pass complication");
+      }
+    });
+    appDocument.querySelector("#scenario-stuck-phrase").value = "¿Puede repetirlo más despacio?";
+    appDocument.querySelector("#scenario-stuck-meaning").value = "Could you repeat that more slowly?";
+    appDocument.querySelector('#scenario-form [name="completed"]').checked = true;
+    appDocument.querySelector("#scenario-form").requestSubmit();
+    await waitFor(() => !appDocument.querySelector("#scenario-form"));
+    test("A difficult scenario phrase can be sent to spaced review", () => {
+      const updated = JSON.parse(localStorage.getItem("spanishTravelCompanionState"));
+      const phrase = updated.deck.find((card) => card.spanish === "¿Puede repetirlo más despacio?");
+      if (!phrase || !phrase.source.startsWith("scenario:")) {
+        throw new Error("Expected a scenario-sourced review card");
+      }
+      if (!Object.values(updated.scenarios).some((scenario) => scenario.completed && scenario.lastPractised)) {
+        throw new Error("Expected completed scenario progress");
       }
     });
 

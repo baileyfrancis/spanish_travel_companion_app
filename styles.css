@@ -802,6 +802,71 @@ kbd {
   gap: 0.65rem;
 }
 
+.scenario-list .card + .card {
+  margin-top: 0;
+}
+
+.scenario-round {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.75rem;
+  margin: 1rem 0;
+  padding: 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-small);
+  background: color-mix(in srgb, var(--surface-2) 36%, var(--surface));
+}
+
+.scenario-round h3,
+.scenario-round p:last-child {
+  margin-bottom: 0;
+}
+
+.scenario-step {
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--primary);
+  color: #fff;
+  font-weight: 850;
+}
+
+.scenario-cues {
+  display: grid;
+  gap: 0.45rem;
+  margin: 0.75rem 0 0;
+  padding-left: 1.25rem;
+}
+
+.scenario-round-challenge {
+  border-color: color-mix(in srgb, var(--accent) 32%, var(--border));
+  background: color-mix(in srgb, var(--accent-soft) 50%, var(--surface));
+}
+
+.scenario-round-challenge .scenario-step {
+  background: var(--accent);
+}
+
+.scenario-support {
+  margin-bottom: 1rem;
+}
+
+.scenario-reflection {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.range-labels {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  color: var(--muted);
+  font-size: 0.7rem;
+}
+
 .list-card {
   padding: 0.85rem;
   border: 1px solid var(--border);
@@ -1321,6 +1386,10 @@ td {
 
   .review-actions {
     grid-template-columns: repeat(4, 1fr);
+  }
+
+  .scenario-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .keyboard-hint {

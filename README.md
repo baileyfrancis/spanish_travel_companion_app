@@ -22,7 +22,7 @@ The app uses plain HTML, CSS, and JavaScript. It has no backend, account, build 
 - Overdue-first review batches with configurable sizes, retry counts, keyboard controls, and outcome summaries
 - Custom phrases, a 120-phrase practical travel phrasebook, phrase management, and Anki-friendly CSV export
 - Speaking prompts, 1/2/5-minute timer, reflection log, and weekly minutes
-- Twelve practical travel scenarios with notes and confidence tracking
+- Twenty-two practical two-pass travel rehearsals with recall cues, complications, notes, confidence tracking, and phrase capture
 - Progress, activity-date streaks, achievements, weakness detection, and monthly milestones
 - Scheduled Read2Speak reviews and stale-scenario follow-up recommendations
 - Listening ladder and curated free-resource links

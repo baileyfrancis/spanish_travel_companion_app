@@ -1559,9 +1559,23 @@
   function renderScenarios() {
     const avg = scenarioAverage();
     const completed = Object.values(state.scenarios).filter((item) => item.completed).length;
-    const weak = DATA.scenarios
-      .slice()
-      .sort((a, b) => Number(state.scenarios[a.id]?.confidence || 0) - Number(state.scenarios[b.id]?.confidence || 0))[0];
+    const stale = staleScenarios()[0];
+    const attempted = DATA.scenarios
+      .filter((scenario) => state.scenarios[scenario.id])
+      .sort((a, b) =>
+        Number(state.scenarios[a.id].confidence) - Number(state.scenarios[b.id].confidence) ||
+        String(state.scenarios[a.id].lastPractised || "").localeCompare(String(state.scenarios[b.id].lastPractised || ""))
+      )[0];
+    const unattempted = DATA.scenarios.find((scenario) => !state.scenarios[scenario.id]);
+    const recommended = stale?.scenario || (attempted && state.scenarios[attempted.id].confidence < 4 ? attempted : unattempted) || attempted;
+    const recommendationReason = stale
+      ? `You last practised this ${daysBetween(stale.record.lastPractised, localISO())} days ago. Revisit it before it fades.`
+      : recommended && state.scenarios[recommended.id]
+        ? `Your confidence is ${state.scenarios[recommended.id].confidence}/5. Another full run should make the sequence easier to retrieve.`
+        : "This scenario is still untested. Try one full run without looking at the Spanish first.";
+    const needsPractice = DATA.scenarios.filter((scenario) =>
+      !state.scenarios[scenario.id] || state.scenarios[scenario.id].confidence < 4
+    ).length;
 
     view.innerHTML = `
       ${viewHeader("Travel scenarios", "Rehearse complete situations so useful Spanish arrives as a sequence, not a word hunt.")}
@@ -1569,13 +1583,13 @@
         <div class="stat"><span class="stat-value">${completed}/${DATA.scenarios.length}</span><span class="stat-label">Completed</span></div>
         <div class="stat"><span class="stat-value">${avg ? avg.toFixed(1) : "—"}</span><span class="stat-label">Average confidence</span></div>
         <div class="stat"><span class="stat-value">${Object.keys(state.scenarios).length}</span><span class="stat-label">Attempted</span></div>
-        <div class="stat"><span class="stat-value">${weak ? escapeHTML(weak.title.split(" ")[0]) : "—"}</span><span class="stat-label">Suggested next</span></div>
+        <div class="stat"><span class="stat-value">${needsPractice}</span><span class="stat-label">Need practice</span></div>
       </section>
-      ${weak ? `
+      ${recommended ? `
         <section class="card card-accent">
           <div class="card-header">
-            <div><span class="badge badge-accent">Recommended</span><h3 style="margin-top:.4rem">${escapeHTML(weak.title)}</h3><p class="muted">This is currently untested or among your lowest-confidence scenarios.</p></div>
-            <button class="button" type="button" data-action="open-scenario" data-id="${weak.id}">Practise</button>
+            <div><span class="badge badge-accent">Recommended</span><h3 style="margin-top:.4rem">${escapeHTML(recommended.title)}</h3><p class="muted">${escapeHTML(recommendationReason)}</p></div>
+            <button class="button" type="button" data-action="open-scenario" data-id="${recommended.id}">Start rehearsal</button>
           </div>
         </section>` : ""}
       <section class="scenario-list">
@@ -1608,32 +1622,73 @@
     const scenario = DATA.scenarios.find((item) => item.id === id);
     if (!scenario) return;
     const progress = state.scenarios[id] || { confidence: 3, completed: false, notes: "" };
+    const lastPractised = progress.lastPractised
+      ? `<span class="badge badge-muted">Last practised ${escapeHTML(formatDate(progress.lastPractised))}</span>`
+      : `<span class="badge badge-muted">First attempt</span>`;
     openModal(`
       <div class="modal-header">
-        <div><span class="badge">${escapeHTML(scenario.category)}</span><h2 style="margin-top:.35rem">${escapeHTML(scenario.title)}</h2></div>
+        <div>
+          <div class="chip-row"><span class="badge">${escapeHTML(scenario.category)}</span>${lastPractised}</div>
+          <h2 style="margin-top:.35rem">${escapeHTML(scenario.title)}</h2>
+        </div>
         <button class="icon-button" type="button" data-action="close-modal" aria-label="Close">×</button>
       </div>
       <p>${escapeHTML(scenario.situation)}</p>
-      <h3>Key vocabulary</h3>
-      <div class="chip-row">${scenario.vocabulary.map((word) => `<span class="chip" lang="es">${escapeHTML(word)}</span>`).join("")}</div>
-      <h3 style="margin-top:1rem">Useful phrases</h3>
-      <ul>${scenario.phrases.map((phrase) => `<li lang="es">${escapeHTML(phrase)}</li>`).join("")}</ul>
-      <div class="recommendation">
-        <h3>Roleplay</h3>
-        <p>${escapeHTML(scenario.roleplay)}</p>
-      </div>
-      <form id="scenario-form" class="stack" style="margin-top:1rem">
+      <section class="scenario-round" aria-labelledby="scenario-round-one">
+        <span class="scenario-step" aria-hidden="true">1</span>
+        <div>
+          <h3 id="scenario-round-one">First pass: no help</h3>
+          <p class="muted">Speak aloud. Join these ideas into one natural exchange before opening the support below.</p>
+          <ol class="scenario-cues">
+            ${scenario.cues.map((cue) => `<li>${escapeHTML(cue)}</li>`).join("")}
+          </ol>
+        </div>
+      </section>
+      <details class="details scenario-support">
+        <summary>Reveal phrase support</summary>
+        <div class="details-body">
+          <h3>Key vocabulary</h3>
+          <div class="chip-row">${scenario.vocabulary.map((word) => `<span class="chip" lang="es">${escapeHTML(word)}</span>`).join("")}</div>
+          <h3 style="margin-top:1rem">Useful phrases</h3>
+          <ul>${scenario.phrases.map((phrase) => `<li lang="es">${escapeHTML(phrase)}</li>`).join("")}</ul>
+        </div>
+      </details>
+      <section class="scenario-round scenario-round-challenge" aria-labelledby="scenario-round-two">
+        <span class="scenario-step" aria-hidden="true">2</span>
+        <div>
+          <h3 id="scenario-round-two">Second pass: handle the complication</h3>
+          <p class="muted">Play both roles. Keep going for at least three turns each, even if the wording is imperfect.</p>
+          <p><strong>Your complication:</strong> ${escapeHTML(scenario.roleplay)}</p>
+        </div>
+      </section>
+      <form id="scenario-form" class="stack scenario-reflection">
         <input type="hidden" name="scenarioId" value="${scenario.id}">
         <div class="form-group">
-          <label for="scenario-confidence">Confidence: <span id="scenario-confidence-value">${progress.confidence || 3}</span>/5</label>
+          <label for="scenario-confidence">How ready would you feel in real life? <span id="scenario-confidence-value">${progress.confidence || 3}</span>/5</label>
           <input id="scenario-confidence" name="confidence" type="range" min="1" max="5" value="${progress.confidence || 3}" data-action="range-output" data-output="scenario-confidence-value">
+          <span class="range-labels" aria-hidden="true"><span>Blocked</span><span>Managed it</span><span>Ready</span></span>
         </div>
         <div class="form-group">
-          <label for="scenario-notes">Notes</label>
-          <textarea id="scenario-notes" name="notes" placeholder="Where did you hesitate?">${escapeHTML(progress.notes || "")}</textarea>
+          <label for="scenario-notes">What should be easier next time?</label>
+          <textarea id="scenario-notes" name="notes" placeholder="A phrase to retrieve faster, a question to understand, or a detail to personalise…">${escapeHTML(progress.notes || "")}</textarea>
         </div>
-        <label class="check-option"><input type="checkbox" name="completed" ${progress.completed ? "checked" : ""}> Mark scenario complete</label>
-        <button class="button" type="submit">Save scenario</button>
+        <details class="details">
+          <summary>Add a difficult phrase to Review</summary>
+          <div class="details-body stack">
+            <p class="help-text">Save one phrase you needed during the roleplay so spaced repetition brings it back later.</p>
+            <div class="form-group">
+              <label for="scenario-stuck-phrase">Spanish phrase</label>
+              <input class="input" id="scenario-stuck-phrase" name="stuckPhrase" lang="es" autocomplete="off">
+            </div>
+            <div class="form-group">
+              <label for="scenario-stuck-meaning">Meaning or cue</label>
+              <input class="input" id="scenario-stuck-meaning" name="stuckMeaning" autocomplete="off">
+            </div>
+            <label class="check-option"><input type="checkbox" name="savePhrase" checked> Add this phrase to Review</label>
+          </div>
+        </details>
+        <label class="check-option"><input type="checkbox" name="completed" ${progress.completed ? "checked" : ""}> I completed both speaking passes</label>
+        <button class="button" type="submit">Save rehearsal</button>
       </form>
     `);
   }
@@ -2945,13 +3000,41 @@
 
     if (form.id === "scenario-form") {
       const id = formData.get("scenarioId");
+      const scenario = DATA.scenarios.find((item) => item.id === id);
+      if (!scenario) return;
+      const stuckPhrase = formData.get("stuckPhrase").trim();
+      const stuckMeaning = formData.get("stuckMeaning").trim();
+      const shouldSavePhrase = Boolean(formData.get("savePhrase"));
+      let phraseAdded = false;
       state.scenarios[id] = {
         confidence: Number(formData.get("confidence")),
         notes: formData.get("notes").trim(),
         completed: Boolean(formData.get("completed")),
         lastPractised: localISO()
       };
-      saveState("Scenario progress saved.");
+      if (shouldSavePhrase && stuckPhrase && stuckMeaning && !duplicateCard(stuckPhrase)) {
+        state.deck.push({
+          id: uid(`scenario-${id}`),
+          spanish: stuckPhrase,
+          english: stuckMeaning,
+          category: scenario.category,
+          source: `scenario:${id}`,
+          reviewStage: 0,
+          dueDate: localISO(),
+          correctCount: 0,
+          incorrectCount: 0,
+          suspended: false,
+          lastReviewed: null,
+          createdAt: localISO()
+        });
+        phraseAdded = true;
+      }
+      const incompletePhrase = shouldSavePhrase && Boolean(stuckPhrase || stuckMeaning) && (!stuckPhrase || !stuckMeaning);
+      saveState(incompletePhrase
+        ? "Rehearsal saved. Add both the Spanish phrase and its meaning to create a review card."
+        : phraseAdded
+          ? "Rehearsal saved and phrase added to Review."
+          : "Scenario rehearsal saved.");
       closeModal();
       renderScenarios();
     }
