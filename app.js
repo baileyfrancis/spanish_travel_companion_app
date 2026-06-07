@@ -4,7 +4,7 @@
   const DATA = window.APP_DATA;
   const CORE = window.APP_CORE;
   const STORAGE_KEY = "spanishTravelCompanionState";
-  const STATE_VERSION = 5;
+  const STATE_VERSION = 6;
   const DAY_MS = 86400000;
   const GOOD_INTERVALS = CORE.GOOD_INTERVALS;
   const VALID_TASK_IDS = ["read", "listen", "speak", "review", "travel"];
@@ -29,6 +29,11 @@
   let timerSeconds = 120;
   let timerRemaining = 120;
   let timerInterval = null;
+  let speakingExerciseId = null;
+  let speakingPass = 1;
+  let speakingPassOneComplete = false;
+  let speakingSessionComplete = false;
+  let speakingElapsedSeconds = 0;
   let toastTimer = null;
   let notesSaveTimer = null;
   let pendingServiceWorker = null;
@@ -221,15 +226,14 @@
 
     const speakingLogs = (Array.isArray(saved.speakingLogs) ? saved.speakingLogs : [])
       .filter(isObject)
-      .map((log) => ({
-        id: typeof log.id === "string" && log.id ? log.id : uid("speak"),
-        date: isDateString(log.date) ? log.date : localISO(),
-        prompt: typeof log.prompt === "string" ? log.prompt : "Speaking practice",
-        minutes: clamp(Math.round(finiteNumber(log.minutes, 1)), 1, 120),
-        difficulty: clamp(Math.round(finiteNumber(log.difficulty, 3)), 1, 5),
-        stuckPhrase: typeof log.stuckPhrase === "string" ? log.stuckPhrase : "",
-        notes: typeof log.notes === "string" ? log.notes : ""
-      }));
+      .map((log) => {
+        const normalized = CORE.normalizeSpeakingLog(log, {
+          localISO,
+          uid: () => uid("speak")
+        });
+        normalized.date = isDateString(normalized.date) ? normalized.date : localISO();
+        return normalized;
+      });
 
     const scenarios = {};
     if (isObject(saved.scenarios)) {
@@ -1440,84 +1444,219 @@
     renderReview();
   }
 
+  function recommendedSpeakingExercise() {
+    const exercises = DATA.speakingExercises;
+    const weakLog = state.speakingLogs
+      .slice()
+      .sort((a, b) => b.date.localeCompare(a.date))
+      .slice(0, 8)
+      .find((log) => log.retrieval <= 2 && exercises.some((exercise) => exercise.id === log.exerciseId));
+    if (weakLog) return exercises.find((exercise) => exercise.id === weakLog.exerciseId);
+
+    const stale = staleScenarios(10)
+      .map(({ scenario }) => exercises.find((exercise) => exercise.id === scenario.id))
+      .find(Boolean);
+    return stale || exercises[(planDayNumber() - 1) % exercises.length];
+  }
+
+  function currentSpeakingExercise() {
+    const exercises = DATA.speakingExercises;
+    const selected = exercises.find((exercise) => exercise.id === speakingExerciseId);
+    const exercise = selected || recommendedSpeakingExercise();
+    speakingExerciseId = exercise.id;
+    return exercise;
+  }
+
+  function speakingMinutesForSession() {
+    const activeSeconds = Math.max(0, timerSeconds - timerRemaining);
+    return Math.max(1, Math.ceil((speakingElapsedSeconds + activeSeconds) / 60));
+  }
+
+  function resetSpeakingSession(resetExercise = false) {
+    stopTimer(false);
+    timerRemaining = timerSeconds;
+    speakingPass = 1;
+    speakingPassOneComplete = false;
+    speakingSessionComplete = false;
+    speakingElapsedSeconds = 0;
+    if (resetExercise) speakingExerciseId = null;
+  }
+
+  function renderSpeakingSupport(exercise, open = false) {
+    return `
+      <details class="details speaking-support" ${open ? "open" : ""}>
+        <summary>Need help? Show phrase support</summary>
+        <div class="details-body">
+          ${exercise.support.map(([spanish, english]) => `
+            <div class="support-phrase">
+              <strong lang="es">${escapeHTML(spanish)}</strong>
+              <span class="muted">${escapeHTML(english)}</span>
+            </div>
+          `).join("")}
+        </div>
+      </details>
+    `;
+  }
+
   function renderSpeaking() {
-    const prompt = DATA.speakingPrompts[(planDayNumber() - 1) % DATA.speakingPrompts.length];
+    const exercise = currentSpeakingExercise();
     const weekly = speakingMinutesThisWeek();
     const recent = state.speakingLogs.slice().sort((a, b) => b.date.localeCompare(a.date)).slice(0, 6);
+    const timerStarted = timerRemaining < timerSeconds || Boolean(timerInterval);
+    const passLabel = speakingPass === 1 ? "First attempt" : "Second attempt";
     view.innerHTML = `
       ${viewHeader("Speaking", "Build the habit of retrieving Spanish before you need it in the real world.")}
-      <section class="grid grid-2">
-        <div class="card card-accent">
-          <span class="badge">Today’s prompt</span>
-          <h3 style="font-size:1.25rem;margin-top:.65rem">${escapeHTML(prompt)}</h3>
-          <p class="muted">Keep moving. Use simpler Spanish when a word is missing.</p>
-          <div class="timer-options" aria-label="Timer duration">
-            ${[60, 120, 300].map((seconds) => `
-              <button class="button ${timerSeconds === seconds ? "" : "button-secondary"}" type="button" data-action="set-timer" data-seconds="${seconds}">
-                ${seconds / 60} min
-              </button>`).join("")}
+      <section class="card card-accent speaking-session">
+        <div class="card-header">
+          <div>
+            <span class="badge">${speakingSessionComplete ? "Reflect" : passLabel}</span>
+            <h3>${escapeHTML(exercise.title)}</h3>
           </div>
-          <div class="timer-display" id="timer-display" aria-live="off">${formatTimer(timerRemaining)}</div>
-          <div class="button-row" style="justify-content:center">
-            <button class="button" type="button" data-action="toggle-timer">${timerInterval ? "Pause" : (timerRemaining < timerSeconds ? "Resume" : "Start speaking")}</button>
-            <button class="button button-secondary" type="button" data-action="reset-timer">Reset</button>
+          <button class="button button-small button-secondary" type="button" data-action="different-speaking-exercise">Different exercise</button>
+        </div>
+        <p class="speaking-prompt">${escapeHTML(exercise.prompt)}</p>
+
+        <div class="speaking-guidance">
+          <div>
+            <strong>Communication targets</strong>
+            <ul>${exercise.targets.map((target) => `<li>${escapeHTML(target)}</li>`).join("")}</ul>
+          </div>
+          <div>
+            <strong>Keep going with</strong>
+            <ul>${exercise.followUps.map((question) => `<li>${escapeHTML(question)}</li>`).join("")}</ul>
           </div>
         </div>
 
-        <form class="card stack" id="speaking-log-form">
-          <div>
-            <h3>Log this practice</h3>
-            <p class="muted">${weekly} minutes spoken this week.</p>
-          </div>
-          <input type="hidden" name="prompt" value="${escapeHTML(prompt)}">
-          <div class="grid grid-2">
-            <div class="form-group">
-              <label for="speaking-date">Date</label>
-              <input class="input" id="speaking-date" name="date" type="date" value="${localISO()}" required>
+        ${!speakingSessionComplete ? `
+          ${renderSpeakingSupport(exercise, speakingPassOneComplete)}
+          ${!timerStarted && !speakingPassOneComplete ? `
+            <div class="timer-options" aria-label="Timer duration">
+              ${[60, 120, 300].map((seconds) => `
+                <button class="button ${timerSeconds === seconds ? "" : "button-secondary"}" type="button" data-action="set-timer" data-seconds="${seconds}">
+                  ${seconds / 60} min
+                </button>`).join("")}
             </div>
-            <div class="form-group">
-              <label for="speaking-minutes">Minutes spoken</label>
-              <input class="input" id="speaking-minutes" name="minutes" type="number" min="1" max="120" value="${Math.max(1, Math.round((timerSeconds - timerRemaining) / 60) || timerSeconds / 60)}" required>
+          ` : ""}
+          <div class="timer-display ${timerRemaining === 0 ? "timer-finished" : ""}" id="timer-display" aria-live="off">${formatTimer(timerRemaining)}</div>
+          ${speakingPassOneComplete && speakingPass === 1 ? `
+            <div class="speaking-transition">
+              <strong>First attempt complete.</strong>
+              <p>Review only what you need, then repeat the same task with fewer pauses or clearer detail.</p>
+              <div class="button-row">
+                <button class="button" type="button" data-action="start-second-speaking-pass">Start second attempt</button>
+                <button class="button button-secondary" type="button" data-action="finish-one-speaking-pass">Reflect after one attempt</button>
+              </div>
             </div>
-          </div>
-          <div class="form-group">
-            <label for="speaking-difficulty">Difficulty: <span id="difficulty-value">3</span>/5</label>
-            <input id="speaking-difficulty" name="difficulty" type="range" min="1" max="5" value="3" data-action="range-output" data-output="difficulty-value">
-          </div>
-          <div class="form-group">
-            <label for="stuck-phrase">Spanish phrase I got stuck on</label>
-            <input class="input" id="stuck-phrase" name="stuckPhrase" lang="es" placeholder="The Spanish phrase, even if incomplete">
-          </div>
-          <div class="form-group">
-            <label for="stuck-meaning">Meaning for review card (optional)</label>
-            <input class="input" id="stuck-meaning" name="stuckMeaning" placeholder="Add this if you want to save the phrase">
-          </div>
-          <div class="form-group">
-            <label for="speaking-notes">Reflection notes</label>
-            <textarea id="speaking-notes" name="notes" placeholder="What flowed? What will you try next time?"></textarea>
-          </div>
-          <label class="check-option">
-            <input type="checkbox" name="savePhrase"> Save the phrase to my review deck
-          </label>
-          <button class="button" type="submit">Save speaking log</button>
-        </form>
+          ` : `
+            <div class="button-row speaking-timer-actions">
+              <button class="button" type="button" data-action="toggle-timer">
+                ${timerInterval ? "Pause" : (timerStarted ? "Resume" : `Start ${passLabel.toLowerCase()}`)}
+              </button>
+              ${timerStarted ? `<button class="button button-secondary" type="button" data-action="finish-speaking-pass">Finish attempt</button>` : ""}
+              <button class="button button-secondary" type="button" data-action="reset-speaking-session">Reset</button>
+            </div>
+          `}
+          <p class="help-text speaking-instruction">Speak without reading a script. Keep moving with simpler Spanish when a word is missing.</p>
+        ` : `
+          <form class="speaking-reflection" id="speaking-log-form">
+            <input type="hidden" name="exerciseId" value="${escapeHTML(exercise.id)}">
+            <input type="hidden" name="prompt" value="${escapeHTML(exercise.prompt)}">
+            <input type="hidden" name="minutes" value="${speakingMinutesForSession()}">
+            <input type="hidden" name="passes" value="${speakingPassOneComplete && speakingPass === 2 ? 2 : 1}">
+            <div class="form-group">
+              <span class="label">How easily could you retrieve the Spanish?</span>
+              <div class="retrieval-options">
+                ${[
+                  [1, "Mostly stuck"],
+                  [2, "Frequent pauses"],
+                  [3, "Some pauses"],
+                  [4, "Mostly fluid"],
+                  [5, "Comfortable"]
+                ].map(([value, label]) => `
+                  <label class="choice-chip">
+                    <input type="radio" name="retrieval" value="${value}" ${value === 3 ? "checked" : ""}>
+                    <span>${label}</span>
+                  </label>
+                `).join("")}
+              </div>
+            </div>
+            ${speakingPass === 2 ? `
+              <div class="form-group">
+                <span class="label">Compared with the first attempt</span>
+                <div class="choice-row">
+                  <label class="choice-chip"><input type="radio" name="improved" value="yes" checked><span>Easier</span></label>
+                  <label class="choice-chip"><input type="radio" name="improved" value="same"><span>About the same</span></label>
+                  <label class="choice-chip"><input type="radio" name="improved" value="harder"><span>Harder</span></label>
+                </div>
+              </div>
+            ` : `<input type="hidden" name="improved" value="not-compared">`}
+            <div class="form-group">
+              <label for="speaking-focus">Main thing to work on</label>
+              <select id="speaking-focus" name="focus">
+                ${[
+                  ["", "No single issue"],
+                  ["vocabulary", "Finding useful words and phrases"],
+                  ["grammar", "Building accurate sentences"],
+                  ["pronunciation", "Pronunciation and rhythm"],
+                  ["listening-response", "Reacting without preparation"],
+                  ["confidence", "Continuing under pressure"],
+                  ["fluency", "Connecting ideas smoothly"]
+                ].map(([value, label]) => `<option value="${value}" ${value === exercise.focus ? "selected" : ""}>${label}</option>`).join("")}
+              </select>
+            </div>
+            <details class="details speaking-reflection-more">
+              <summary>Add a phrase or reflection</summary>
+              <div class="details-body">
+                <div class="form-group">
+                  <label for="stuck-phrase">Spanish phrase I got stuck on</label>
+                  <input class="input" id="stuck-phrase" name="stuckPhrase" lang="es" placeholder="The Spanish phrase, even if incomplete">
+                </div>
+                <div class="form-group">
+                  <label for="stuck-meaning">Meaning for a review card</label>
+                  <input class="input" id="stuck-meaning" name="stuckMeaning" placeholder="Optional English meaning">
+                </div>
+                <label class="check-option">
+                  <input type="checkbox" name="savePhrase"> Save the complete phrase to Review
+                </label>
+                <div class="form-group">
+                  <label for="speaking-notes">One useful note for next time</label>
+                  <textarea id="speaking-notes" name="notes" placeholder="What helped, or what will you change?"></textarea>
+                </div>
+              </div>
+            </details>
+            <div class="speaking-save-row">
+              <p class="muted">${speakingMinutesForSession()} min · ${weekly} min already logged this week</p>
+              <button class="button" type="submit">Save practice</button>
+            </div>
+          </form>
+        `}
       </section>
 
       <section class="card">
         <div class="card-header">
-          <div><h3>Recent speaking</h3><p class="muted">A record of showing up, not a performance score.</p></div>
+          <div><h3>Recent speaking</h3><p class="muted">Repeat difficult exercises and notice what becomes easier.</p></div>
           <span class="badge">${weekly} min this week</span>
         </div>
         <div class="resource-list">
           ${recent.length ? recent.map((log) => `
-            <div class="list-card">
+            <div class="list-card speaking-log">
               <div class="list-card-header">
                 <div>
-                  <strong>${escapeHTML(log.prompt)}</strong>
-                  <p class="muted">${formatDate(log.date)} · ${log.minutes} min · Difficulty ${log.difficulty}/5</p>
-                  ${log.stuckPhrase ? `<p>Stuck on: ${escapeHTML(log.stuckPhrase)}</p>` : ""}
+                  <div class="speaking-log-title">
+                    <strong>${escapeHTML(DATA.speakingExercises.find((exerciseItem) => exerciseItem.id === log.exerciseId)?.title || log.prompt)}</strong>
+                    ${log.retrieval <= 2 ? `<span class="badge badge-muted">Retry</span>` : ""}
+                  </div>
+                  <p class="muted">${formatDate(log.date)} · ${log.minutes} min · ${log.passes} ${log.passes === 1 ? "attempt" : "attempts"} · ${["", "Mostly stuck", "Frequent pauses", "Some pauses", "Mostly fluid", "Comfortable"][log.retrieval]}</p>
+                  ${log.focus ? `<p>Focus: ${escapeHTML(log.focus.replace("-", " "))}</p>` : ""}
+                  ${log.stuckPhrase ? `<p lang="es">Stuck on: ${escapeHTML(log.stuckPhrase)}</p>` : ""}
+                  ${log.notes ? `<p class="muted">${escapeHTML(log.notes)}</p>` : ""}
                 </div>
-                <button class="button button-small button-danger" type="button" data-action="delete-speaking-log" data-id="${log.id}">Delete</button>
+                <div class="button-row">
+                  ${log.exerciseId && DATA.speakingExercises.some((exerciseItem) => exerciseItem.id === log.exerciseId)
+                    ? `<button class="button button-small button-secondary" type="button" data-action="repeat-speaking-exercise" data-id="${escapeHTML(log.exerciseId)}">Repeat</button>`
+                    : ""}
+                  <button class="button button-small button-danger" type="button" data-action="delete-speaking-log" data-id="${log.id}">Delete</button>
+                </div>
               </div>
             </div>`).join("") : `<p class="empty-state">Your first speaking log will appear here.</p>`}
         </div>
@@ -1525,9 +1664,31 @@
     `;
   }
 
+  function completeSpeakingPass() {
+    const elapsed = timerRemaining <= 0 ? timerSeconds : timerSeconds - timerRemaining;
+    if (elapsed < 1) {
+      showToast("Start speaking before finishing the attempt.");
+      return;
+    }
+    speakingElapsedSeconds += elapsed;
+    stopTimer(false);
+    timerRemaining = 0;
+    if (speakingPass === 1) speakingPassOneComplete = true;
+    else speakingSessionComplete = true;
+    renderSpeaking();
+  }
+
+  function startSecondSpeakingPass() {
+    speakingPass = 2;
+    timerRemaining = timerSeconds;
+    speakingSessionComplete = false;
+    renderSpeaking();
+  }
+
   function formatTimer(seconds) {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
+    const safeSeconds = Math.max(0, seconds);
+    const mins = Math.floor(safeSeconds / 60);
+    const secs = safeSeconds % 60;
     return `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
   }
 
@@ -1537,14 +1698,16 @@
       renderSpeaking();
       return;
     }
+    if (timerRemaining <= 0) return;
     timerInterval = setInterval(() => {
-      timerRemaining -= 1;
+      timerRemaining = Math.max(0, timerRemaining - 1);
       const display = $("#timer-display");
       if (display) display.textContent = formatTimer(timerRemaining);
-      if (timerRemaining <= 0) {
-        stopTimer(false);
-        showToast("Timer complete. Log the practice while it is fresh.");
-        renderSpeaking();
+      if (timerRemaining === 0) {
+        completeSpeakingPass();
+        showToast(speakingPassOneComplete && speakingPass === 1
+          ? "First attempt complete. Review what you need, then repeat it."
+          : "Second attempt complete. Log what changed.");
       }
     }, 1000);
     renderSpeaking();
@@ -2700,15 +2863,32 @@
     }
     if (action === "export-csv") exportCSV();
     if (action === "set-timer") {
-      stopTimer(false);
       timerSeconds = Number(button.dataset.seconds);
-      timerRemaining = timerSeconds;
+      resetSpeakingSession();
       renderSpeaking();
     }
     if (action === "toggle-timer") toggleTimer();
-    if (action === "reset-timer") {
-      stopTimer(true);
+    if (action === "finish-speaking-pass") completeSpeakingPass();
+    if (action === "start-second-speaking-pass") startSecondSpeakingPass();
+    if (action === "finish-one-speaking-pass") {
+      speakingSessionComplete = true;
       renderSpeaking();
+    }
+    if (action === "reset-speaking-session") {
+      resetSpeakingSession();
+      renderSpeaking();
+    }
+    if (action === "different-speaking-exercise") {
+      const currentIndex = DATA.speakingExercises.findIndex((exercise) => exercise.id === speakingExerciseId);
+      speakingExerciseId = DATA.speakingExercises[(currentIndex + 1) % DATA.speakingExercises.length].id;
+      resetSpeakingSession();
+      renderSpeaking();
+    }
+    if (action === "repeat-speaking-exercise") {
+      speakingExerciseId = button.dataset.id;
+      resetSpeakingSession();
+      renderSpeaking();
+      window.scrollTo({ top: 0, behavior: "smooth" });
     }
     if (action === "delete-speaking-log") {
       if (!window.confirm("Delete this speaking log?")) return;
@@ -2964,12 +3144,19 @@
       const stuckPhrase = formData.get("stuckPhrase").trim();
       const stuckMeaning = formData.get("stuckMeaning").trim();
       const shouldSavePhrase = Boolean(formData.get("savePhrase"));
+      const retrieval = Number(formData.get("retrieval"));
+      let phraseAdded = false;
       state.speakingLogs.push({
         id: uid("speak"),
-        date: formData.get("date"),
+        date: localISO(),
         prompt: formData.get("prompt"),
+        exerciseId: formData.get("exerciseId"),
         minutes: Number(formData.get("minutes")),
-        difficulty: Number(formData.get("difficulty")),
+        difficulty: 6 - retrieval,
+        retrieval,
+        focus: formData.get("focus"),
+        passes: Number(formData.get("passes")),
+        improved: formData.get("improved"),
         stuckPhrase,
         notes: formData.get("notes").trim()
       });
@@ -2989,12 +3176,21 @@
             lastReviewed: null,
             createdAt: localISO()
           });
+          phraseAdded = true;
         }
       }
-      stopTimer(true);
+      const todayRecord = getDayRecord(planDayNumber(), true);
+      todayRecord.completedTasks = Array.from(new Set([...todayRecord.completedTasks, "speak"]));
+      if (todayRecord.completedTasks.length === VALID_TASK_IDS.length) {
+        todayRecord.done = true;
+        todayRecord.completedDate = localISO();
+      }
+      resetSpeakingSession(true);
       saveState(shouldSavePhrase && (!stuckPhrase || !stuckMeaning)
         ? "Speaking saved. Add both the Spanish phrase and its meaning to create a review card."
-        : "Speaking practice saved.");
+        : phraseAdded
+          ? "Speaking saved and phrase added to Review."
+          : "Speaking practice saved.");
       renderSpeaking();
     }
 
@@ -3235,7 +3431,14 @@
 
   applyTheme();
   if (TEST_MODE) {
-    window.APP_TEST_API = { normalizeState, showImportPreview };
+    window.APP_TEST_API = {
+      normalizeState,
+      showImportPreview,
+      completeSpeakingTimer() {
+        timerRemaining = 0;
+        completeSpeakingPass();
+      }
+    };
   }
   setActiveTab(activeTab);
   if (!TEST_MODE) registerServiceWorker();

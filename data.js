@@ -352,27 +352,277 @@
     "phrasebook-30", "phrasebook-32", "phrasebook-35", "phrasebook-37"
   ];
 
-  const speakingPrompts = [
-    "Introduce yourself and explain why you are learning Spanish.",
-    "Describe your day from waking up to going to bed.",
-    "Explain tomorrow’s plan using voy a.",
-    "Order a meal and ask two questions about the menu.",
-    "Ask for directions, then repeat the route back to confirm it.",
-    "Explain a problem with an accommodation booking.",
-    "Describe symptoms and ask for advice at a pharmacy.",
-    "Talk through your likely six-month travel route.",
-    "Describe where you live and compare it with a place you want to visit.",
-    "Tell the story of a journey that went well or badly.",
-    "Explain what kind of food, weather, and activities you prefer.",
-    "Ask a local for recommendations and respond with follow-up questions.",
-    "Explain that you lost an important item and describe it.",
-    "Describe what you did yesterday in chronological order.",
-    "Talk about a challenge you expect while travelling and how you will handle it.",
-    "Give a two-minute summary of something you watched in Spanish.",
-    "Roleplay meeting another traveller and making a plan together.",
-    "Explain your dietary needs or allergies clearly.",
-    "Compare two countries or cities on your route.",
-    "Talk yourself through a complete travel day."
+  const speakingExercises = [
+    {
+      id: "introduce-yourself",
+      title: "Meet another traveller",
+      prompt: "Introduce yourself, say where you are from, and explain why you are learning Spanish.",
+      focus: "confidence",
+      targets: ["Give three connected details", "Ask one question back"],
+      followUps: ["How long will you travel?", "Which place are you most excited to visit?"],
+      support: [["Estoy aprendiendo español porque…", "I am learning Spanish because…"], ["¿Y tú?", "And you?"]]
+    },
+    {
+      id: "daily-routine",
+      title: "Describe your normal day",
+      prompt: "Describe your day from waking up to going to bed.",
+      focus: "grammar",
+      targets: ["Use sequencing words", "Include one reflexive verb"],
+      followUps: ["What changes at weekends?", "Which part of the day do you prefer?"],
+      support: [["Primero…", "First…"], ["Después suelo…", "Afterwards I usually…"]]
+    },
+    {
+      id: "tomorrow-plan",
+      title: "Plan tomorrow",
+      prompt: "Explain tomorrow’s plan, including where you are going and what you need to do.",
+      focus: "grammar",
+      targets: ["Use voy a three times", "Mention a time and place"],
+      followUps: ["What will you do if it rains?", "Who will go with you?"],
+      support: [["Mañana voy a…", "Tomorrow I am going to…"], ["Si tengo tiempo…", "If I have time…"]]
+    },
+    {
+      id: "order-meal",
+      title: "Order a meal",
+      prompt: "Order a meal, ask two questions about the menu, and request the bill.",
+      focus: "vocabulary",
+      targets: ["Make a polite request", "Check one ingredient"],
+      followUps: ["What do you recommend?", "Does this contain nuts or dairy?"],
+      support: [["Quisiera pedir…", "I would like to order…"], ["¿Me trae la cuenta, por favor?", "Could you bring me the bill, please?"]]
+    },
+    {
+      id: "directions",
+      title: "Confirm directions",
+      prompt: "Ask how to reach a bus station, then repeat the route back to confirm it.",
+      focus: "listening-response",
+      targets: ["Ask for repetition", "Confirm two route details"],
+      followUps: ["How long does it take?", "Is it safe to walk there?"],
+      support: [["¿Cómo llego a…?", "How do I get to…?"], ["Entonces, sigo recto y luego…", "So, I go straight and then…"]]
+    },
+    {
+      id: "booking-problem",
+      title: "Solve a booking problem",
+      prompt: "Explain that an accommodation booking cannot be found and ask what options are available.",
+      focus: "confidence",
+      targets: ["State the problem clearly", "Ask for a practical solution"],
+      followUps: ["Can you check the confirmation number?", "Is another room available?"],
+      support: [["Tengo una reserva a nombre de…", "I have a reservation under…"], ["¿Qué podemos hacer?", "What can we do?"]]
+    },
+    {
+      id: "pharmacy",
+      title: "Ask at a pharmacy",
+      prompt: "Describe two symptoms, say how long you have had them, and ask for advice.",
+      focus: "vocabulary",
+      targets: ["Name symptoms", "Explain duration and severity"],
+      followUps: ["How often should I take it?", "Do I need to see a doctor?"],
+      support: [["Me duele…", "My … hurts"], ["Tengo esto desde hace…", "I have had this for…"]]
+    },
+    {
+      id: "travel-route",
+      title: "Explain your route",
+      prompt: "Talk through your likely travel route and explain why you chose three stops.",
+      focus: "fluency",
+      targets: ["Connect at least four ideas", "Give reasons with porque"],
+      followUps: ["How will you travel between them?", "Where might you stay longer?"],
+      support: [["Primero quiero ir a…", "First I want to go to…"], ["Elegí este lugar porque…", "I chose this place because…"]]
+    },
+    {
+      id: "compare-places",
+      title: "Compare two places",
+      prompt: "Compare where you live with a Latin American place you want to visit.",
+      focus: "grammar",
+      targets: ["Make three comparisons", "Mention weather, size, or pace"],
+      followUps: ["Which place seems more affordable?", "What might be difficult to adjust to?"],
+      support: [["Es más… que…", "It is more… than…"], ["En cambio…", "On the other hand…"]]
+    },
+    {
+      id: "journey-story",
+      title: "Tell a journey story",
+      prompt: "Tell the story of a journey that went well or badly.",
+      focus: "fluency",
+      targets: ["Set the scene", "Describe the problem and outcome"],
+      followUps: ["How did you feel?", "What would you do differently?"],
+      support: [["Todo empezó cuando…", "It all started when…"], ["Al final…", "In the end…"]]
+    },
+    {
+      id: "preferences",
+      title: "Explain your preferences",
+      prompt: "Explain what kind of food, weather, accommodation, and activities you prefer while travelling.",
+      focus: "vocabulary",
+      targets: ["Give four preferences", "Explain at least two reasons"],
+      followUps: ["What would you avoid?", "Which preference is flexible?"],
+      support: [["Prefiero… porque…", "I prefer… because…"], ["No me importa si…", "I do not mind if…"]]
+    },
+    {
+      id: "local-recommendations",
+      title: "Ask for recommendations",
+      prompt: "Ask a local for recommendations, react to the answer, and ask two follow-up questions.",
+      focus: "listening-response",
+      targets: ["React naturally", "Ask specific follow-ups"],
+      followUps: ["Is it busy at weekends?", "What is the best time to go?"],
+      support: [["¿Qué me recomienda?", "What do you recommend?"], ["Suena bien. ¿Y…?", "That sounds good. And…?"]]
+    },
+    {
+      id: "lost-item",
+      title: "Report a lost item",
+      prompt: "Explain that you lost an important item, describe it, and say where you last saw it.",
+      focus: "vocabulary",
+      targets: ["Describe colour, size, and contents", "Give a time and location"],
+      followUps: ["Has anyone handed it in?", "What should you do next?"],
+      support: [["He perdido…", "I have lost…"], ["La última vez que lo vi fue…", "The last time I saw it was…"]]
+    },
+    {
+      id: "yesterday",
+      title: "Describe yesterday",
+      prompt: "Describe what you did yesterday in chronological order.",
+      focus: "grammar",
+      targets: ["Use at least four past-tense verbs", "Connect events clearly"],
+      followUps: ["What was the best moment?", "Did anything unexpected happen?"],
+      support: [["Ayer fui a…", "Yesterday I went to…"], ["Luego decidí…", "Then I decided…"]]
+    },
+    {
+      id: "travel-challenge",
+      title: "Prepare for a challenge",
+      prompt: "Describe a challenge you expect while travelling and explain how you will handle it.",
+      focus: "confidence",
+      targets: ["Explain the risk", "Give a step-by-step response"],
+      followUps: ["Who could help?", "What could you prepare in advance?"],
+      support: [["Me preocupa…", "I am worried about…"], ["Si pasa, voy a…", "If it happens, I am going to…"]]
+    },
+    {
+      id: "media-summary",
+      title: "Summarise Spanish input",
+      prompt: "Give a short summary of something you recently watched or heard in Spanish.",
+      focus: "fluency",
+      targets: ["State the main idea", "Mention two details without translating"],
+      followUps: ["What did you understand easily?", "What was still unclear?"],
+      support: [["Se trataba de…", "It was about…"], ["Lo principal es que…", "The main point is that…"]]
+    },
+    {
+      id: "make-a-plan",
+      title: "Make plans with someone",
+      prompt: "Roleplay meeting another traveller and agreeing on an activity, time, and meeting place.",
+      focus: "listening-response",
+      targets: ["Make a suggestion", "Accept or adjust a plan"],
+      followUps: ["What if that time is inconvenient?", "How will you recognise each other?"],
+      support: [["¿Te apetece…?", "Do you feel like…?"], ["¿Qué tal si quedamos a las…?", "How about meeting at…?"]]
+    },
+    {
+      id: "dietary-needs",
+      title: "Explain dietary needs",
+      prompt: "Explain your dietary needs or allergies and check that a meal is suitable.",
+      focus: "confidence",
+      targets: ["State what you cannot eat", "Confirm preparation or ingredients"],
+      followUps: ["Is it cooked separately?", "What alternative is available?"],
+      support: [["Soy alérgico/a a…", "I am allergic to…"], ["¿Lleva…?", "Does it contain…?"]]
+    },
+    {
+      id: "choose-destination",
+      title: "Choose between destinations",
+      prompt: "Compare two countries or cities on your route and decide which you would visit first.",
+      focus: "grammar",
+      targets: ["Compare at least three factors", "State and defend a decision"],
+      followUps: ["Which is easier to reach?", "Which offers something unique?"],
+      support: [["Por un lado…", "On one hand…"], ["Me quedaría con…", "I would choose…"]]
+    },
+    {
+      id: "complete-travel-day",
+      title: "Simulate a travel day",
+      prompt: "Talk yourself through a complete travel day from checkout to arriving at the next accommodation.",
+      focus: "fluency",
+      targets: ["Cover five stages", "Include one possible problem"],
+      followUps: ["What must you confirm?", "What will you do on arrival?"],
+      support: [["Antes de salir…", "Before leaving…"], ["Cuando llegue…", "When I arrive…"]]
+    },
+    {
+      id: "airport-check-in",
+      title: "Check in for a flight",
+      prompt: "Check in for a flight, ask about your bag, and confirm the gate and boarding time.",
+      focus: "vocabulary",
+      targets: ["Give booking details", "Confirm two pieces of information"],
+      followUps: ["Is the flight on time?", "Can you choose an aisle seat?"],
+      support: [["Aquí tiene mi pasaporte.", "Here is my passport."], ["¿A qué hora empieza el embarque?", "What time does boarding begin?"]]
+    },
+    {
+      id: "bus-delay",
+      title: "Handle a bus delay",
+      prompt: "Ask why a bus is delayed, whether it will still leave today, and what alternatives exist.",
+      focus: "listening-response",
+      targets: ["Ask three direct questions", "Repeat the answer to confirm"],
+      followUps: ["Can the ticket be changed?", "Where will updates appear?"],
+      support: [["¿Cuánto retraso lleva?", "How delayed is it?"], ["Entonces, ¿sale a las…?", "So, does it leave at…?"]]
+    },
+    {
+      id: "taxi-ride",
+      title: "Manage a taxi ride",
+      prompt: "Give a destination, confirm the approximate fare, and ask the driver to use a safer or faster route.",
+      focus: "confidence",
+      targets: ["Confirm price before leaving", "Give one route instruction"],
+      followUps: ["Can you pay by card?", "Could the driver stop here?"],
+      support: [["¿Cuánto cuesta más o menos?", "About how much does it cost?"], ["¿Puede dejarme aquí?", "Can you drop me here?"]]
+    },
+    {
+      id: "market-bargain",
+      title: "Buy something at a market",
+      prompt: "Ask about an item, its price and material, then politely negotiate or decline.",
+      focus: "vocabulary",
+      targets: ["Ask three product questions", "Close the exchange politely"],
+      followUps: ["Is there another size?", "What price could you offer?"],
+      support: [["¿De qué está hecho?", "What is it made of?"], ["¿Me lo deja en…?", "Would you let me have it for…?"]]
+    },
+    {
+      id: "atm-problem",
+      title: "Explain an ATM problem",
+      prompt: "Explain that an ATM kept your card or did not give you cash, and ask for immediate help.",
+      focus: "confidence",
+      targets: ["State exactly what happened", "Ask what to do next"],
+      followUps: ["Was your account charged?", "When can the card be recovered?"],
+      support: [["El cajero se quedó con mi tarjeta.", "The ATM kept my card."], ["¿Puede ayudarme ahora?", "Can you help me now?"]]
+    },
+    {
+      id: "border-questions",
+      title: "Answer border questions",
+      prompt: "Answer questions about your travel purpose, planned stay, accommodation, and onward journey.",
+      focus: "confidence",
+      targets: ["Give concise answers", "State dates and destinations clearly"],
+      followUps: ["Where are you staying first?", "Do you have proof of onward travel?"],
+      support: [["Vengo de turismo.", "I am here as a tourist."], ["Pienso quedarme hasta…", "I plan to stay until…"]]
+    },
+    {
+      id: "clinic-visit",
+      title: "Speak to a clinician",
+      prompt: "Describe what happened, your symptoms, and any medicine or allergies the clinician should know about.",
+      focus: "vocabulary",
+      targets: ["Describe onset and severity", "Answer likely follow-up questions"],
+      followUps: ["Does movement make it worse?", "Have you taken any medicine?"],
+      support: [["Empezó hace…", "It started … ago"], ["Soy alérgico/a a…", "I am allergic to…"]]
+    },
+    {
+      id: "emergency-call",
+      title: "Make an emergency call",
+      prompt: "State where you are, what happened, how many people need help, and any immediate danger.",
+      focus: "confidence",
+      targets: ["Lead with location", "Use short, clear sentences"],
+      followUps: ["Is anyone unconscious?", "Can you stay on the line?"],
+      support: [["Necesitamos ayuda en…", "We need help at…"], ["Hay una persona que…", "There is a person who…"]]
+    },
+    {
+      id: "tour-booking",
+      title: "Book a tour",
+      prompt: "Ask about a tour’s schedule, difficulty, group size, inclusions, and cancellation policy.",
+      focus: "vocabulary",
+      targets: ["Ask four practical questions", "Confirm the final arrangement"],
+      followUps: ["What should you bring?", "Is transport included?"],
+      support: [["¿Qué incluye el precio?", "What does the price include?"], ["Quisiera reservar para…", "I would like to book for…"]]
+    },
+    {
+      id: "social-invitation",
+      title: "Respond to an invitation",
+      prompt: "Respond to a social invitation, ask for the practical details, and accept or decline naturally.",
+      focus: "listening-response",
+      targets: ["Show interest before deciding", "Ask about time and place"],
+      followUps: ["Should you bring anything?", "Who else will be there?"],
+      support: [["¡Qué buena idea!", "What a good idea!"], ["Me encantaría, pero…", "I would love to, but…"]]
+    }
   ];
 
   const scenarios = [
@@ -1046,7 +1296,7 @@
     milestones,
     phrasebook,
     starterDeckIds,
-    speakingPrompts,
+    speakingExercises,
     scenarios,
     listeningLadder,
     regionalNotes,

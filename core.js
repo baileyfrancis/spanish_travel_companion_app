@@ -100,6 +100,33 @@
     return next;
   }
 
+  function normalizeSpeakingLog(log, helpers) {
+    const source = log && typeof log === "object" ? log : {};
+    const finite = (value, fallback = 0) => {
+      const number = Number(value);
+      return Number.isFinite(number) ? number : fallback;
+    };
+    const difficulty = clamp(Math.round(finite(source.difficulty, 3)), 1, 5);
+    return {
+      id: typeof source.id === "string" && source.id ? source.id : helpers.uid(),
+      date: typeof source.date === "string" ? source.date : helpers.localISO(),
+      prompt: typeof source.prompt === "string" ? source.prompt : "Speaking practice",
+      exerciseId: typeof source.exerciseId === "string" ? source.exerciseId : "",
+      minutes: clamp(Math.round(finite(source.minutes, 1)), 1, 120),
+      difficulty,
+      retrieval: clamp(Math.round(finite(source.retrieval, 6 - difficulty)), 1, 5),
+      focus: ["vocabulary", "grammar", "pronunciation", "listening-response", "confidence", "fluency"].includes(source.focus)
+        ? source.focus
+        : "",
+      passes: clamp(Math.round(finite(source.passes, 1)), 1, 2),
+      improved: ["yes", "same", "harder", "not-compared"].includes(source.improved)
+        ? source.improved
+        : "not-compared",
+      stuckPhrase: typeof source.stuckPhrase === "string" ? source.stuckPhrase : "",
+      notes: typeof source.notes === "string" ? source.notes : ""
+    };
+  }
+
   function summarizeState(state) {
     const daily = state?.daily && typeof state.daily === "object" ? state.daily : {};
     const deck = Array.isArray(state?.deck) ? state.deck : [];
@@ -122,6 +149,7 @@
     GOOD_INTERVALS,
     calculateStreaks,
     normalizeSettings,
+    normalizeSpeakingLog,
     rateReviewCard,
     sortDueCards,
     summarizeState

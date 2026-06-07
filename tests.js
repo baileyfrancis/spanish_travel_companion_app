@@ -128,6 +128,20 @@
     });
   });
 
+  test("Speaking log migration supplies retrieval defaults", () => {
+    const normalized = CORE.normalizeSpeakingLog({
+      id: "old-log",
+      date: "2026-06-01",
+      prompt: "Old prompt",
+      minutes: 2,
+      difficulty: 4
+    }, {
+      localISO: () => "2026-06-07",
+      uid: () => "new-log"
+    });
+    equal([normalized.retrieval, normalized.passes, normalized.improved], [2, 1, "not-compared"]);
+  });
+
   try {
     const [manifest, serviceWorker] = await Promise.all([
       fetch("manifest.json").then((response) => response.json()),
@@ -367,6 +381,74 @@
       }
     });
 
+    frame.contentWindow.location.hash = "speaking";
+    await waitFor(() => appDocument.querySelector("#view-title")?.textContent === "Speaking");
+    test("Speaking catalogue contains structured practical exercises", () => {
+      if (frame.contentWindow.APP_DATA.speakingExercises.length < 30) {
+        throw new Error("Expected at least 30 speaking exercises");
+      }
+      frame.contentWindow.APP_DATA.speakingExercises.forEach((exercise) => {
+        if (!exercise.id || exercise.targets.length < 2 || exercise.followUps.length < 2 || exercise.support.length < 2) {
+          throw new Error(`${exercise.title || exercise.id} is incomplete`);
+        }
+      });
+    });
+    test("Speaking starts with recall and optional support", () => {
+      if (!appDocument.querySelector(".speaking-prompt")?.textContent.trim()) {
+        throw new Error("Expected a speaking prompt");
+      }
+      if (appDocument.querySelector(".speaking-support").open) {
+        throw new Error("Phrase support should begin collapsed");
+      }
+      if (appDocument.querySelector("#speaking-log-form")) {
+        throw new Error("Reflection should wait until speaking is complete");
+      }
+    });
+
+    frame.contentWindow.APP_TEST_API.completeSpeakingTimer();
+    await waitFor(() => appDocument.querySelector('[data-action="start-second-speaking-pass"]'));
+    test("First attempt reveals support and offers a second pass", () => {
+      if (!appDocument.querySelector(".speaking-support").open) {
+        throw new Error("Support should open between attempts");
+      }
+      if (!appDocument.querySelector(".timer-finished")?.textContent.includes("00:00")) {
+        throw new Error("Completed timer should stop at zero");
+      }
+    });
+    appDocument.querySelector('[data-action="start-second-speaking-pass"]').click();
+    frame.contentWindow.APP_TEST_API.completeSpeakingTimer();
+    await waitFor(() => appDocument.querySelector("#speaking-log-form"));
+    test("Second attempt leads to compact retrieval reflection", () => {
+      equal(appDocument.querySelectorAll('[name="retrieval"]').length, 5);
+      if (!appDocument.querySelector('[name="improved"]')) {
+        throw new Error("Expected an improvement comparison");
+      }
+    });
+
+    appDocument.querySelector('[name="retrieval"][value="2"]').checked = true;
+    appDocument.querySelector("#stuck-phrase").value = "¿Dónde hago transbordo?";
+    appDocument.querySelector("#stuck-meaning").value = "Where do I change?";
+    appDocument.querySelector('[name="savePhrase"]').checked = true;
+    appDocument.querySelector("#speaking-log-form").requestSubmit();
+    await waitFor(() => appDocument.querySelector(".speaking-log"));
+    test("Speaking save records two passes, updates today, and creates review phrases", () => {
+      const updated = JSON.parse(localStorage.getItem("spanishTravelCompanionState"));
+      const log = updated.speakingLogs.at(-1);
+      equal([log.retrieval, log.passes, log.improved], [2, 2, "yes"]);
+      if (!Object.values(updated.daily).some((record) => record.completedTasks?.includes("speak"))) {
+        throw new Error("Expected today's speaking task to be complete");
+      }
+      if (!updated.deck.some((card) => card.spanish === "¿Dónde hago transbordo?" && card.source === "speaking")) {
+        throw new Error("Expected a speaking-sourced review card");
+      }
+    });
+    const repeatedExerciseTitle = appDocument.querySelector(".speaking-log-title strong").textContent;
+    appDocument.querySelector('[data-action="repeat-speaking-exercise"]').click();
+    test("Recent speaking entries can restart the same exercise", () => {
+      equal(appDocument.querySelector(".speaking-session h3").textContent, repeatedExerciseTitle);
+      if (appDocument.querySelector("#speaking-log-form")) throw new Error("Expected a fresh speaking session");
+    });
+
     frame.contentWindow.location.hash = "scenarios";
     await waitFor(() => appDocument.querySelector("#view-title")?.textContent === "Travel scenarios");
     test("Scenario recommendations explain the next rehearsal", () => {
@@ -432,7 +514,11 @@
 
   const failures = results.filter((result) => !result.passed);
   document.body.dataset.status = failures.length ? "failed" : "passed";
-  document.querySelector("#summary").textContent = failures.length
+  const summaryText = failures.length
     ? `${failures.length} of ${results.length} tests failed.`
     : `${results.length} tests passed.`;
+  document.querySelector("#summary").textContent = summaryText;
+  document.title = failures.length
+    ? `Tests failed (${failures.length}): ${failures.map((failure) => failure.name).join(" | ")}`
+    : `Tests passed: ${results.length}`;
 })();
