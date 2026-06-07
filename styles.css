@@ -47,6 +47,10 @@
   box-sizing: border-box;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 html {
   scroll-behavior: smooth;
   background: var(--bg);
@@ -664,7 +668,44 @@ input[type="range"] {
   text-align: center;
 }
 
-.phrase-spanish {
+.review-progress,
+.review-undo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  text-align: left;
+}
+
+.review-progress {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.review-progress strong {
+  color: var(--text);
+  font-size: 0.88rem;
+}
+
+.review-undo {
+  padding: 0.55rem 0.65rem;
+  border: 1px solid color-mix(in srgb, var(--primary) 30%, var(--border));
+  border-radius: 10px;
+  background: var(--primary-soft);
+  font-size: 0.82rem;
+}
+
+.review-prompt-label {
+  margin-bottom: 0.35rem;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 750;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.phrase-prompt {
   margin-bottom: 0.5rem;
   font-size: clamp(1.45rem, 7vw, 2.2rem);
   font-weight: 800;
@@ -672,9 +713,12 @@ input[type="range"] {
 }
 
 .phrase-answer {
+  margin-top: 1rem;
   padding-top: 0.85rem;
   border-top: 1px solid var(--border);
-  font-size: 1.05rem;
+  font-size: clamp(1.25rem, 5vw, 1.7rem);
+  font-weight: 750;
+  line-height: 1.3;
 }
 
 .review-actions {
@@ -685,12 +729,54 @@ input[type="range"] {
 
 .review-actions .button {
   flex-direction: column;
-  padding: 0.6rem;
+  padding: 0.65rem 0.45rem;
 }
 
 .review-actions small {
   font-size: 0.67rem;
   opacity: 0.82;
+}
+
+.review-actions small + small {
+  font-weight: 800;
+  opacity: 1;
+}
+
+.review-summary {
+  margin: 0.9rem 0;
+  padding: 0.75rem;
+  border-radius: 10px;
+  background: var(--surface-2);
+}
+
+.keyboard-hint {
+  display: none;
+  margin: 0.9rem 0 0;
+  color: var(--muted);
+  font-size: 0.74rem;
+}
+
+kbd {
+  display: inline-block;
+  min-width: 1.55rem;
+  padding: 0.08rem 0.3rem;
+  border: 1px solid var(--border);
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-weight: 750;
+  text-align: center;
+}
+
+.review-management {
+  margin-top: 0.9rem;
+}
+
+.review-management > .details-body {
+  display: grid;
+  gap: 0.9rem;
 }
 
 .timer-display {
@@ -1235,6 +1321,10 @@ td {
 
   .review-actions {
     grid-template-columns: repeat(4, 1fr);
+  }
+
+  .keyboard-hint {
+    display: block;
   }
 
   .deck-item .list-card-header {

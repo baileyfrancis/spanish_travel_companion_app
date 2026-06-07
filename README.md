@@ -17,10 +17,10 @@ The app uses plain HTML, CSS, and JavaScript. It has no backend, account, build 
 - First-run setup for level, trip date, weekly time, session length, and route
 - Five-minute fallback and missed-day catch-up modes
 - Local hours and notes logging
-- Spaced-repetition phrase deck with Again, Hard, Good, and Easy ratings
-- Phrase editing, pausing, deletion, duplicate protection, and same-session retry
-- Overdue-first review batches with configurable session sizes
-- Custom phrases, built-in travel phrasebook, and Anki-friendly CSV export
+- Spaced-repetition phrase deck with active English-to-Spanish recall and optional reverse prompts
+- Guided Again, Hard, Good, and Easy ratings with exact schedules, same-session retry, and undo
+- Overdue-first review batches with configurable sizes, retry counts, keyboard controls, and outcome summaries
+- Custom phrases, a 120-phrase practical travel phrasebook, phrase management, and Anki-friendly CSV export
 - Speaking prompts, 1/2/5-minute timer, reflection log, and weekly minutes
 - Twelve practical travel scenarios with notes and confidence tracking
 - Progress, activity-date streaks, achievements, weakness detection, and monthly milestones

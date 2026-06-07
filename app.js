@@ -22,6 +22,9 @@
   let reviewSessionReviewed = new Set();
   let reviewRetryQueue = [];
   let reviewSessionCardIds = [];
+  let reviewSessionOutcomes = new Map();
+  let reviewUndo = null;
+  let reviewPromptDirection = "english";
   let quickSession = null;
   let timerSeconds = 120;
   let timerRemaining = 120;
@@ -735,6 +738,8 @@
       reviewSessionReviewed = new Set();
       reviewRetryQueue = [];
       reviewSessionCardIds = [];
+      reviewSessionOutcomes = new Map();
+      reviewUndo = null;
       reviewCardId = null;
       reviewRevealed = false;
     }
@@ -1141,7 +1146,9 @@
     if (!reviewSessionCardIds.length && due.length) {
       reviewSessionCardIds = due.slice(0, state.settings.reviewSessionLimit).map((card) => card.id);
     }
-    const sessionCards = due.filter((card) => reviewSessionCardIds.includes(card.id));
+    const sessionCards = reviewSessionCardIds
+      .map((id) => state.deck.find((card) => card.id === id))
+      .filter((card) => card && !card.suspended);
     const firstPass = sessionCards.filter((card) => !reviewSessionReviewed.has(card.id));
     if (!reviewCardId || !sessionCards.some((card) => card.id === reviewCardId)) {
       reviewCardId = firstPass[0]?.id || null;
@@ -1154,93 +1161,179 @@
     const card = state.deck.find((item) => item.id === reviewCardId);
     const firstPassComplete = reviewSessionCardIds.filter((id) => reviewSessionReviewed.has(id)).length;
     const moreDue = due.some((item) => !reviewSessionCardIds.includes(item.id));
+    const currentIsRetry = Boolean(card && reviewSessionReviewed.has(card.id));
+    const retryCount = reviewRetryQueue.length + (currentIsRetry ? 1 : 0);
+    const recalledCount = [...reviewSessionOutcomes.values()].filter((rating) => rating !== "again").length;
+    const needsPracticeCount = [...reviewSessionOutcomes.values()].filter((rating) => rating === "again").length;
+    const promptIsEnglish = reviewPromptDirection === "english";
+    const batchComplete = Boolean(
+      reviewSessionCardIds.length &&
+      firstPassComplete === reviewSessionCardIds.length &&
+      !retryCount &&
+      !card
+    );
 
     view.innerHTML = `
-      ${viewHeader("Phrase review", "Turn useful travel language into phrases you can retrieve under pressure.")}
+      ${viewHeader(
+        "Phrase review",
+        "Retrieve the phrase aloud before revealing it.",
+        `<button class="button button-small button-secondary" type="button" data-action="toggle-review-direction">
+          ${promptIsEnglish ? "English → Spanish" : "Spanish → English"}
+        </button>`
+      )}
       <section class="stats-grid">
         <div class="stat"><span class="stat-value">${due.length}</span><span class="stat-label">Due now</span></div>
-        <div class="stat"><span class="stat-value">${firstPassComplete}/${reviewSessionCardIds.length || 0}</span><span class="stat-label">This session</span></div>
-        <div class="stat"><span class="stat-value">${state.deck.length}</span><span class="stat-label">In your deck</span></div>
+        <div class="stat"><span class="stat-value">${firstPassComplete}/${reviewSessionCardIds.length || 0}</span><span class="stat-label">First pass</span></div>
+        <div class="stat"><span class="stat-value">${retryCount}</span><span class="stat-label">Retries waiting</span></div>
         <div class="stat"><span class="stat-value">${masteredCards().length}</span><span class="stat-label">Mastered</span></div>
       </section>
 
       <section class="card phrase-card">
+        ${reviewUndo ? `
+          <div class="review-undo" role="status">
+            <span>Rated <strong>${escapeHTML(reviewUndo.ratingLabel)}</strong>.</span>
+            <button class="button button-small button-secondary" type="button" data-action="undo-review">Undo</button>
+          </div>
+        ` : ""}
         ${card ? `
+          <div class="review-progress">
+            <strong>${currentIsRetry ? "Retry" : `Card ${firstPassComplete + 1} of ${reviewSessionCardIds.length}`}</strong>
+            <span>${firstPass.length} first-pass card${firstPass.length === 1 ? "" : "s"} left${retryCount ? ` · ${retryCount} retr${retryCount === 1 ? "y" : "ies"}` : ""}</span>
+          </div>
           <div class="chip-row" style="justify-content:center;margin-bottom:.8rem">
             <span class="badge">${escapeHTML(card.category)}</span>
             <span class="badge badge-muted">${escapeHTML(card.source)}</span>
             <span class="badge badge-muted">Stage ${card.reviewStage}</span>
           </div>
-          <div class="phrase-spanish" lang="es">${escapeHTML(card.spanish)}</div>
+          <p class="review-prompt-label">${promptIsEnglish ? "Say this in Spanish" : "What does this mean?"}</p>
+          <div class="phrase-prompt" ${promptIsEnglish ? "" : `lang="es"`}>${escapeHTML(promptIsEnglish ? card.english : card.spanish)}</div>
           ${reviewRevealed ? `
-            <div class="phrase-answer">${escapeHTML(card.english)}</div>
-            <p class="muted">Say the Spanish once more before rating.</p>
+            <div class="phrase-answer" ${promptIsEnglish ? `lang="es"` : ""}>${escapeHTML(promptIsEnglish ? card.spanish : card.english)}</div>
+            <p class="muted">${promptIsEnglish ? "Say the Spanish once more, then rate your first attempt." : "Check the meaning, then rate your first attempt."}</p>
             <div class="review-actions">
-              <button class="button button-secondary" type="button" data-action="rate-review" data-rating="again">Again<small>today</small></button>
-              <button class="button button-secondary" type="button" data-action="rate-review" data-rating="hard">Hard<small>1 day</small></button>
-              <button class="button" type="button" data-action="rate-review" data-rating="good">Good<small>next interval</small></button>
-              <button class="button button-accent" type="button" data-action="rate-review" data-rating="easy">Easy<small>jump ahead</small></button>
+              ${renderReviewRatingButton(card, "again", "Again", "Couldn’t recall", "button-secondary", "1")}
+              ${renderReviewRatingButton(card, "hard", "Hard", "Recalled with effort", "button-secondary", "2")}
+              ${renderReviewRatingButton(card, "good", "Good", "Recalled correctly", "", "3")}
+              ${renderReviewRatingButton(card, "easy", "Easy", "Immediate and confident", "button-accent", "4")}
             </div>
           ` : `<button class="button" type="button" data-action="reveal-review">Show answer</button>`}
+          <p class="keyboard-hint">Keyboard: <kbd>Space</kbd> reveal · <kbd>1</kbd>–<kbd>4</kbd> rate</p>
         ` : `
           <div class="empty-state">
-            <h3>${due.length ? "Review batch complete" : "All caught up"}</h3>
-            <p>${due.length
-              ? `${reviewSessionCardIds.length} cards completed in this batch.${moreDue ? " More due cards are ready when you are." : ""}`
+            <h3>${batchComplete ? "Review batch complete" : "All caught up"}</h3>
+            <p>${batchComplete
+              ? `${reviewSessionCardIds.length} cards completed.${moreDue ? " More due cards are ready when you are." : " You cleared the due queue."}`
               : "No phrase reviews are due today. Add a useful phrase or come back tomorrow."}</p>
+            ${reviewSessionOutcomes.size ? `
+              <p class="review-summary"><strong>${recalledCount} recalled</strong> · <strong>${needsPracticeCount} needed another attempt</strong></p>
+            ` : ""}
             ${moreDue ? `<button class="button" type="button" data-action="next-review-batch">Review next ${Math.min(state.settings.reviewSessionLimit, due.length)} cards</button>` : ""}
             ${due.length && !moreDue ? `<button class="button button-secondary" type="button" data-action="restart-review">Review due cards again</button>` : ""}
           </div>
         `}
       </section>
 
-      <section class="grid grid-2" style="margin-top:.9rem">
-        <form class="card stack" id="add-phrase-form">
-          <div>
-            <h3>Add a custom phrase</h3>
-            <p class="muted">Prefer complete chunks you expect to say, not isolated words.</p>
-          </div>
-          <div class="form-group">
-            <label for="phrase-spanish">Spanish</label>
-            <input class="input" id="phrase-spanish" name="spanish" lang="es" required>
-          </div>
-          <div class="form-group">
-            <label for="phrase-english">English</label>
-            <input class="input" id="phrase-english" name="english" required>
-          </div>
-          <div class="form-group">
-            <label for="phrase-category">Category</label>
-            <input class="input" id="phrase-category" name="category" value="Custom">
-          </div>
-          <button class="button" type="submit">Add to review deck</button>
-        </form>
+      <details class="details review-management">
+        <summary>Manage phrases · ${state.deck.length} in your deck · ${DATA.phrasebook.length} in phrasebook</summary>
+        <div class="details-body">
+          <section class="grid grid-2">
+            <form class="card stack" id="add-phrase-form">
+              <div>
+                <h3>Add a custom phrase</h3>
+                <p class="muted">Prefer complete chunks you expect to say, not isolated words.</p>
+              </div>
+              <div class="form-group">
+                <label for="phrase-spanish">Spanish</label>
+                <input class="input" id="phrase-spanish" name="spanish" lang="es" required>
+              </div>
+              <div class="form-group">
+                <label for="phrase-english">English</label>
+                <input class="input" id="phrase-english" name="english" required>
+              </div>
+              <div class="form-group">
+                <label for="phrase-category">Category</label>
+                <input class="input" id="phrase-category" name="category" value="Custom">
+              </div>
+              <button class="button" type="submit">Add to review deck</button>
+            </form>
 
-        <div class="card">
-          <div class="card-header">
-            <div><h3>Phrasebook</h3><p class="muted">Add practical phrases to your review queue. Search to browse beyond the first eight.</p></div>
-          </div>
-          <div class="form-group" style="margin-bottom:.7rem">
-            <label for="phrasebook-filter">Filter phrases</label>
-            <input class="input" id="phrasebook-filter" type="search" placeholder="Food, bus, pharmacy…" data-action="filter-phrasebook">
-          </div>
-          <div id="phrasebook-list" class="resource-list">
-            ${renderPhrasebookItems("")}
-          </div>
-        </div>
-      </section>
+            <div class="card">
+              <div class="card-header">
+                <div><h3>Travel phrasebook</h3><p class="muted">Search practical phrases and add the ones you expect to use.</p></div>
+              </div>
+              <div class="form-group" style="margin-bottom:.7rem">
+                <label for="phrasebook-filter">Filter phrases</label>
+                <input class="input" id="phrasebook-filter" type="search" placeholder="Food, bus, pharmacy…" data-action="filter-phrasebook">
+              </div>
+              <div id="phrasebook-list" class="resource-list">
+                ${renderPhrasebookItems("")}
+              </div>
+            </div>
+          </section>
 
-      <section class="card">
-        <div class="card-header">
-          <div><h3>Manage deck</h3><p class="muted">Edit, pause, or remove phrases. CSV columns are ready for a simple Anki import.</p></div>
-          <button class="button button-secondary" type="button" data-action="export-csv">Export review deck CSV</button>
+          <section class="card">
+            <div class="card-header">
+              <div><h3>Manage deck</h3><p class="muted">Edit, pause, or remove phrases. CSV columns are ready for a simple Anki import.</p></div>
+              <button class="button button-secondary" type="button" data-action="export-csv">Export review deck CSV</button>
+            </div>
+            <div class="form-group" style="margin-bottom:.7rem">
+              <label for="deck-filter">Filter your deck</label>
+              <input class="input" id="deck-filter" type="search" placeholder="Phrase, meaning, or category" data-action="filter-deck">
+            </div>
+            <div id="deck-list" class="resource-list">${renderDeckItems("")}</div>
+          </section>
         </div>
-        <div class="form-group" style="margin-bottom:.7rem">
-          <label for="deck-filter">Filter your deck</label>
-          <input class="input" id="deck-filter" type="search" placeholder="Phrase, meaning, or category" data-action="filter-deck">
-        </div>
-        <div id="deck-list" class="resource-list">${renderDeckItems("")}</div>
-      </section>
+      </details>
     `;
+  }
+
+  function reviewRatingSchedule(card, rating) {
+    const today = localISO();
+    const next = CORE.rateReviewCard(card, rating, today, addDays);
+    if (rating === "again") return "Retry this session";
+    const days = Math.max(1, daysBetween(today, next.dueDate));
+    if (days === 1) return "Tomorrow";
+    return `In ${days} days`;
+  }
+
+  function renderReviewRatingButton(card, rating, label, guidance, className, shortcut) {
+    return `
+      <button class="button ${className}" type="button" data-action="rate-review" data-rating="${rating}" aria-label="${label}: ${guidance}. ${reviewRatingSchedule(card, rating)}. Shortcut ${shortcut}">
+        ${label}
+        <small>${guidance}</small>
+        <small>${reviewRatingSchedule(card, rating)}</small>
+      </button>
+    `;
+  }
+
+  function resetReviewSession() {
+    reviewSessionReviewed = new Set();
+    reviewRetryQueue = [];
+    reviewSessionCardIds = [];
+    reviewSessionOutcomes = new Map();
+    reviewUndo = null;
+    reviewCardId = null;
+    reviewRevealed = false;
+  }
+
+  function undoReview() {
+    if (!reviewUndo) return;
+    const card = state.deck.find((item) => item.id === reviewUndo.card.id);
+    if (!card) {
+      reviewUndo = null;
+      renderReview();
+      return;
+    }
+    Object.assign(card, reviewUndo.card);
+    state.totalReviews = reviewUndo.totalReviews;
+    reviewSessionReviewed = new Set(reviewUndo.reviewed);
+    reviewRetryQueue = [...reviewUndo.retryQueue];
+    reviewSessionOutcomes = new Map(reviewUndo.outcomes);
+    reviewCardId = reviewUndo.card.id;
+    reviewRevealed = true;
+    reviewUndo = null;
+    saveState("Last rating undone.");
+    renderReview();
   }
 
   function renderPhrasebookItems(filter) {
@@ -1326,10 +1419,19 @@
 
   function rateReview(rating) {
     const card = state.deck.find((item) => item.id === reviewCardId);
-    if (!card) return;
+    if (!card || !reviewRevealed || !["again", "hard", "good", "easy"].includes(rating)) return;
     const today = localISO();
+    reviewUndo = {
+      card: { ...card },
+      totalReviews: state.totalReviews,
+      reviewed: [...reviewSessionReviewed],
+      retryQueue: [...reviewRetryQueue],
+      outcomes: [...reviewSessionOutcomes],
+      ratingLabel: rating[0].toUpperCase() + rating.slice(1)
+    };
     Object.assign(card, CORE.rateReviewCard(card, rating, today, addDays));
     if (rating === "again" && !reviewRetryQueue.includes(card.id)) reviewRetryQueue.push(card.id);
+    if (!reviewSessionOutcomes.has(card.id)) reviewSessionOutcomes.set(card.id, rating);
     state.totalReviews += 1;
     reviewSessionReviewed.add(card.id);
     reviewCardId = null;
@@ -2363,6 +2465,8 @@
     reviewSessionReviewed = new Set();
     reviewRetryQueue = [];
     reviewSessionCardIds = [];
+    reviewSessionOutcomes = new Map();
+    reviewUndo = null;
     reviewCardId = null;
     applyTheme();
     closeModal();
@@ -2479,20 +2583,17 @@
       renderReview();
     }
     if (action === "rate-review") rateReview(button.dataset.rating);
+    if (action === "undo-review") undoReview();
+    if (action === "toggle-review-direction") {
+      reviewPromptDirection = reviewPromptDirection === "english" ? "spanish" : "english";
+      renderReview();
+    }
     if (action === "restart-review") {
-      reviewSessionReviewed = new Set();
-      reviewRetryQueue = [];
-      reviewSessionCardIds = [];
-      reviewCardId = null;
-      reviewRevealed = false;
+      resetReviewSession();
       renderReview();
     }
     if (action === "next-review-batch") {
-      reviewSessionReviewed = new Set();
-      reviewRetryQueue = [];
-      reviewSessionCardIds = [];
-      reviewCardId = null;
-      reviewRevealed = false;
+      resetReviewSession();
       renderReview();
     }
     if (action === "add-phrasebook") {
@@ -2519,6 +2620,12 @@
         card.suspended = !card.suspended;
         reviewCardId = null;
         reviewRetryQueue = reviewRetryQueue.filter((id) => id !== card.id);
+        if (card.suspended) {
+          reviewSessionCardIds = reviewSessionCardIds.filter((id) => id !== card.id);
+          reviewSessionReviewed.delete(card.id);
+          reviewSessionOutcomes.delete(card.id);
+        }
+        reviewUndo = null;
         saveState(card.suspended ? "Phrase paused." : "Phrase returned to review.");
         renderReview();
       }
@@ -2529,6 +2636,9 @@
       state.deck = state.deck.filter((item) => item.id !== card.id);
       reviewSessionReviewed.delete(card.id);
       reviewRetryQueue = reviewRetryQueue.filter((id) => id !== card.id);
+      reviewSessionCardIds = reviewSessionCardIds.filter((id) => id !== card.id);
+      reviewSessionOutcomes.delete(card.id);
+      reviewUndo = null;
       if (reviewCardId === card.id) reviewCardId = null;
       saveState("Phrase deleted.");
       renderReview();
@@ -2877,7 +2987,7 @@
       };
       activeDayNumber = null;
       quickSession = null;
-      reviewSessionCardIds = [];
+      resetReviewSession();
       applyTheme();
       saveState("Settings saved.");
       renderSettings();
@@ -2946,6 +3056,22 @@
 
   function handleDocumentKeydown(event) {
     const modal = $(".modal", modalRoot);
+    if (!modal && activeTab === "review" && !event.repeat && !event.altKey && !event.ctrlKey && !event.metaKey) {
+      const target = event.target;
+      const isInteractive = target.closest?.("input, textarea, select, button, a, summary, [contenteditable='true']");
+      if (!isInteractive && (event.key === " " || event.key === "Spacebar") && reviewCardId && !reviewRevealed) {
+        event.preventDefault();
+        reviewRevealed = true;
+        renderReview();
+        return;
+      }
+      const ratings = { 1: "again", 2: "hard", 3: "good", 4: "easy" };
+      if (!isInteractive && reviewRevealed && ratings[event.key]) {
+        event.preventDefault();
+        rateReview(ratings[event.key]);
+        return;
+      }
+    }
     if (!modal) return;
     if (event.key === "Escape") {
       if (!state.settings.onboardingComplete && $("#onboarding-form", modalRoot)) return;

@@ -1,5 +1,5 @@
 const CACHE_PREFIX = "spanish-travel-";
-const CACHE_VERSION = `${CACHE_PREFIX}v8`;
+const CACHE_VERSION = `${CACHE_PREFIX}v10`;
 const APP_SHELL = [
   "./",
   "./index.html",

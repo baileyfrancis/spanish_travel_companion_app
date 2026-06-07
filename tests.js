@@ -188,6 +188,12 @@
     test("Mobile navigation exposes five primary destinations", () => {
       equal(appDocument.querySelectorAll(".bottom-nav .nav-item").length, 5);
     });
+    test("Update banner stays hidden until a new service worker is ready", () => {
+      const banner = appDocument.querySelector("#update-banner");
+      if (!banner.hidden || frame.contentWindow.getComputedStyle(banner).display !== "none") {
+        throw new Error("Update banner is visible without an available update");
+      }
+    });
     test("Existing v4 saves do not reopen first-run setup", () => {
       const migrated = frame.contentWindow.APP_TEST_API.normalizeState({
         version: 4,
@@ -235,9 +241,97 @@
     await waitFor(() => appDocument.querySelector("#view-title")?.textContent === "Phrase review");
     test("Review batches respect the configured card limit", () => {
       const sessionStat = [...appDocument.querySelectorAll(".stat")]
-        .find((item) => item.textContent.includes("This session"));
+        .find((item) => item.textContent.includes("First pass"));
       if (!sessionStat || !sessionStat.textContent.includes("0/5")) {
         throw new Error("Expected a five-card review batch");
+      }
+    });
+    test("Review defaults to active English-to-Spanish retrieval", () => {
+      equal(appDocument.querySelector(".review-prompt-label")?.textContent, "Say this in Spanish");
+      if (!appDocument.querySelector(".phrase-prompt")?.textContent.trim()) {
+        throw new Error("Expected an English review prompt");
+      }
+    });
+    test("Expanded phrasebook covers practical travel situations", () => {
+      if (frame.contentWindow.APP_DATA.phrasebook.length < 100) {
+        throw new Error("Expected at least 100 travel phrases");
+      }
+      const categories = new Set(frame.contentWindow.APP_DATA.phrasebook.map((phrase) => phrase.category));
+      ["Airport", "Transport", "Accommodation", "Food", "Health", "Safety", "Bookings"]
+        .forEach((category) => {
+          if (!categories.has(category)) throw new Error(`Missing ${category} phrases`);
+        });
+    });
+
+    const promptText = appDocument.querySelector(".phrase-prompt").textContent.trim();
+    const reviewedCard = saved.deck.find((card) => card.english === promptText);
+    const reviewsBefore = saved.totalReviews;
+    appDocument.dispatchEvent(new KeyboardEvent("keydown", { key: " ", bubbles: true }));
+    await waitFor(() => appDocument.querySelector(".phrase-answer"));
+    test("Review ratings show recall guidance and the actual schedule", () => {
+      const hardButton = appDocument.querySelector('[data-rating="hard"]');
+      const goodButton = appDocument.querySelector('[data-rating="good"]');
+      if (!hardButton?.textContent.includes("Recalled with effort") || !hardButton.textContent.includes("Tomorrow")) {
+        throw new Error("Hard rating guidance is incomplete");
+      }
+      if (!goodButton?.textContent.includes("Recalled correctly")) {
+        throw new Error("Good rating guidance is incomplete");
+      }
+    });
+
+    appDocument.dispatchEvent(new KeyboardEvent("keydown", { key: "1", bubbles: true }));
+    await waitFor(() => appDocument.querySelector('[data-action="undo-review"]'));
+    test("Keyboard shortcuts can rate a revealed review", () => {
+      const updated = JSON.parse(localStorage.getItem("spanishTravelCompanionState"));
+      const card = updated.deck.find((item) => item.id === reviewedCard.id);
+      equal(updated.totalReviews, reviewsBefore + 1);
+      equal(card.incorrectCount, reviewedCard.incorrectCount + 1);
+    });
+
+    appDocument.querySelector('[data-action="undo-review"]').click();
+    await waitFor(() => !appDocument.querySelector('[data-action="undo-review"]'));
+    test("Undo restores the card schedule and review total", () => {
+      const restored = JSON.parse(localStorage.getItem("spanishTravelCompanionState"));
+      equal(restored.totalReviews, reviewsBefore);
+      equal(restored.deck.find((item) => item.id === reviewedCard.id), reviewedCard);
+    });
+
+    appDocument.querySelector('[data-action="toggle-review-direction"]').click();
+    test("Review direction can be switched without changing saved settings", () => {
+      equal(appDocument.querySelector(".review-prompt-label")?.textContent, "What does this mean?");
+    });
+
+    const retryState = JSON.parse(localStorage.getItem("spanishTravelCompanionState"));
+    retryState.deck = retryState.deck.slice(0, 2).map((card) => ({
+      ...card,
+      dueDate: "2000-01-01",
+      suspended: false
+    }));
+    localStorage.setItem("spanishTravelCompanionState", JSON.stringify(retryState));
+    appDocument = await loadFrame("#review");
+    await waitFor(() => appDocument.querySelector(".phrase-prompt"));
+    const firstPrompt = appDocument.querySelector(".phrase-prompt").textContent.trim();
+    appDocument.querySelector('[data-action="reveal-review"]').click();
+    appDocument.querySelector('[data-rating="again"]').click();
+    await waitFor(() => appDocument.querySelector(".phrase-prompt")?.textContent.trim() !== firstPrompt);
+    test("Failed cards wait until the first pass is complete", () => {
+      if (appDocument.querySelector(".review-progress strong")?.textContent === "Retry") {
+        throw new Error("Failed card returned before the remaining first-pass card");
+      }
+    });
+    appDocument.querySelector('[data-action="reveal-review"]').click();
+    appDocument.querySelector('[data-rating="good"]').click();
+    await waitFor(() => appDocument.querySelector(".review-progress strong")?.textContent === "Retry");
+    test("Failed cards return as same-session retries", () => {
+      equal(appDocument.querySelector(".phrase-prompt").textContent.trim(), firstPrompt);
+    });
+    appDocument.querySelector('[data-action="reveal-review"]').click();
+    appDocument.querySelector('[data-rating="good"]').click();
+    await waitFor(() => appDocument.querySelector(".review-summary"));
+    test("Completed batches summarize first-attempt outcomes", () => {
+      const summary = appDocument.querySelector(".review-summary").textContent;
+      if (!summary.includes("1 recalled") || !summary.includes("1 needed another attempt")) {
+        throw new Error(`Unexpected review summary: ${summary}`);
       }
     });
 
