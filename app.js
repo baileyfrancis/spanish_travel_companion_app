@@ -4,7 +4,7 @@
   const DATA = window.APP_DATA;
   const CORE = window.APP_CORE;
   const STORAGE_KEY = "spanishTravelCompanionState";
-  const STATE_VERSION = 6;
+  const STATE_VERSION = 7;
   const DAY_MS = 86400000;
   const GOOD_INTERVALS = CORE.GOOD_INTERVALS;
   const VALID_TASK_IDS = ["read", "listen", "speak", "review", "travel"];
@@ -192,7 +192,21 @@
           done: Boolean(record.done),
           hours: clamp(finiteNumber(record.hours), 0, 12),
           notes: typeof record.notes === "string" ? record.notes : "",
-          completedDate: isDateString(record.completedDate) ? record.completedDate : null
+          completedDate: isDateString(record.completedDate) ? record.completedDate : null,
+          read2SpeakActivity: isObject(record.read2SpeakActivity)
+            ? {
+                courseId: typeof record.read2SpeakActivity.courseId === "string"
+                  ? record.read2SpeakActivity.courseId
+                  : "",
+                unitNumber: Math.max(1, Math.round(finiteNumber(record.read2SpeakActivity.unitNumber, 1))),
+                sessionId: typeof record.read2SpeakActivity.sessionId === "string"
+                  ? record.read2SpeakActivity.sessionId
+                  : "",
+                status: ["partial", "complete", "fallback"].includes(record.read2SpeakActivity.status)
+                  ? record.read2SpeakActivity.status
+                  : "partial"
+              }
+            : null
         };
       });
     }
@@ -212,6 +226,8 @@
           spanish,
           english,
           category: typeof card.category === "string" && card.category.trim() ? card.category.trim() : "Custom",
+          useCase: typeof card.useCase === "string" ? card.useCase : "",
+          slot: typeof card.slot === "string" ? card.slot : "",
           source: typeof card.source === "string" && card.source.trim() ? card.source.trim() : "custom",
           reviewStage: clamp(Math.floor(finiteNumber(card.reviewStage)), 0, GOOD_INTERVALS.length),
           dueDate: isDateString(card.dueDate) ? card.dueDate : localISO(),
@@ -273,13 +289,22 @@
         const [courseId, unitText] = key.split(":");
         const matchingCourse = DATA.read2SpeakCourses.find((item) => item.id === courseId);
         const unitNumber = Number(unitText);
-        if (!matchingCourse || !matchingCourse.units.some((unit) => unit.number === unitNumber)) return;
+        const matchingUnit = matchingCourse?.units.find((unit) => unit.number === unitNumber);
+        if (!matchingCourse || !matchingUnit) return;
+        const sessionIds = new Set(matchingUnit.sessions.map((session) => session.id));
+        const sessionStatuses = {};
+        if (isObject(record.sessionStatuses)) {
+          Object.entries(record.sessionStatuses).forEach(([id, status]) => {
+            if (sessionIds.has(id) && ["partial", "complete"].includes(status)) {
+              sessionStatuses[id] = status;
+            }
+          });
+        }
+        migrateRead2SpeakCheckpoints(record.completedCheckpoints).forEach((id) => {
+          if (sessionIds.has(id) && !sessionStatuses[id]) sessionStatuses[id] = "complete";
+        });
         read2SpeakUnits[key] = {
-          completedCheckpoints: Array.isArray(record.completedCheckpoints)
-            ? [...new Set(record.completedCheckpoints.filter((id) =>
-              DATA.read2SpeakCheckpoints.some((checkpoint) => checkpoint.id === id)
-            ))]
-            : [],
+          sessionStatuses,
           notes: typeof record.notes === "string" ? record.notes : "",
           confidence: clamp(Math.round(finiteNumber(record.confidence, 3)), 1, 5),
           lastStudied: isDateString(record.lastStudied) ? record.lastStudied : null,
@@ -419,6 +444,25 @@
     return course.units.find((unit) => unit.number === state.read2Speak.currentUnit) || course.units[0];
   }
 
+  function migrateRead2SpeakCheckpoints(completedCheckpoints) {
+    if (!Array.isArray(completedCheckpoints)) return [];
+    const completed = new Set(completedCheckpoints);
+    const migrated = [];
+    const add = (...ids) => ids.forEach((id) => migrated.push(id));
+    if (completed.has("ebook-introduction")) add("ebook-1");
+    if (completed.has("ebook-grammar")) add("ebook-2", "ebook-3", "ebook-4");
+    if (completed.has("ebook-vocabulary")) add("ebook-5");
+    if (completed.has("ebook-examples")) add("ebook-6");
+    if (completed.has("ebook-dialogue")) add("ebook-7");
+    if (completed.has("ebook-practice") || completed.has("ebook-review")) add("ebook-8");
+    if (completed.has("workbook-1-8")) add("workbook-1", "workbook-2");
+    if (completed.has("workbook-9-16")) add("workbook-3", "workbook-4");
+    if (completed.has("workbook-17-25")) add("workbook-5", "workbook-6");
+    if (completed.has("workbook-answers") || completed.has("review-retry")) add("correct-retry");
+    if (completed.has("speaking-activation") || completed.has("unit-review")) add("activate-review");
+    return [...new Set(migrated)];
+  }
+
   function clearRead2SpeakFiles() {
     Object.keys(read2SpeakFiles).forEach((resource) => {
       if (read2SpeakFiles[resource]?.url) URL.revokeObjectURL(read2SpeakFiles[resource].url);
@@ -434,7 +478,7 @@
     const key = read2SpeakUnitKey(courseId, unitNumber);
     if (!state.read2Speak.units[key] && create) {
       state.read2Speak.units[key] = {
-        completedCheckpoints: [],
+        sessionStatuses: {},
         notes: "",
         confidence: 3,
         lastStudied: null,
@@ -442,7 +486,7 @@
       };
     }
     return state.read2Speak.units[key] || {
-      completedCheckpoints: [],
+      sessionStatuses: {},
       notes: "",
       confidence: 3,
       lastStudied: null,
@@ -452,32 +496,36 @@
 
   function read2SpeakUnitProgress(courseId, unitNumber) {
     const record = getRead2SpeakUnitRecord(courseId, unitNumber);
-    const complete = record.completedCheckpoints.length;
-    const total = DATA.read2SpeakCheckpoints.length;
+    const course = DATA.read2SpeakCourses.find((item) => item.id === courseId);
+    const unit = course?.units.find((item) => item.number === unitNumber);
+    const complete = unit?.sessions.filter((session) => record.sessionStatuses[session.id] === "complete").length || 0;
+    const total = unit?.sessions.length || 0;
     return { complete, total, percent: Math.round((complete / total) * 100) };
   }
 
-  function nextRead2SpeakCheckpoint() {
+  function nextRead2SpeakSession() {
+    const unit = currentRead2SpeakUnit();
     const record = getRead2SpeakUnitRecord(state.read2Speak.courseId, state.read2Speak.currentUnit);
-    return DATA.read2SpeakCheckpoints.find((checkpoint) =>
-      !record.completedCheckpoints.includes(checkpoint.id)
+    return unit.sessions.find((session) =>
+      record.sessionStatuses[session.id] !== "complete"
     ) || null;
   }
 
   function dailySubtasks(task) {
     const course = currentRead2SpeakCourse();
     const unit = currentRead2SpeakUnit();
-    const checkpoint = nextRead2SpeakCheckpoint();
+    const session = nextRead2SpeakSession();
     return task.subtasks.map((subtask) => {
       if (subtask.id === "read") {
+        const activity = getDayRecord(task.day).read2SpeakActivity;
         return {
           ...subtask,
           title: `Read2Speak · ${course.level} Unit ${unit.number}`,
           detail: getDayRecord(task.day).completedTasks.includes("read")
-            ? `Course work logged for this plan day.${checkpoint ? ` Next: ${checkpoint.title}.` : " This unit is complete."}`
-            : checkpoint
-              ? `${checkpoint.title}. ${checkpoint.detail}`
-              : `${unit.title} is complete. Review weak points or move to the next unit in Resources.`
+            ? `${activity?.status === "partial" ? "Time-box completed; this session remains in progress." : "Course work logged for this plan day."}${session ? ` Next: Session ${session.number}, ${session.title}.` : " This unit is complete."}`
+            : session
+              ? `Session ${session.number}: ${session.title}. ${session.learn} Retrieve, produce, and capture one useful phrase before you finish.`
+              : `${unit.title} is complete. Review weak points or move to the next unit in Resources. ${task.microFocus?.read || ""}`
         };
       }
       if (subtask.id === "listen" && languageTransferProgress().complete < DATA.languageTransferCourse.lessonCount) {
@@ -486,12 +534,79 @@
           ...subtask,
           title: `Language Transfer · Lesson ${lesson}`,
           detail: getDayRecord(task.day).completedTasks.includes("listen")
-            ? `Listening logged for this plan day. Next: Language Transfer Lesson ${state.languageTransfer.currentLesson}.`
-            : `Complete Lesson ${lesson}. Pause before each answer, respond aloud, then replay anything that did not click.`
+            ? `Listening logged for this plan day. Next: Language Transfer Lesson ${state.languageTransfer.currentLesson}. ${task.microFocus?.listen || ""}`
+            : `Complete Lesson ${lesson}. Pause before each answer, respond aloud, then replay anything that did not click. ${task.microFocus?.listen || ""}`
         };
       }
       return subtask;
     });
+  }
+
+  function dailyTaskAction(task, subtask) {
+    if (subtask.id === "read") {
+      return { label: "Open Read2Speak", tab: "resources", target: "read2speak" };
+    }
+    if (subtask.id === "listen") {
+      return { label: "Open Language Transfer", tab: "resources", target: "language-transfer" };
+    }
+    if (subtask.id === "speak") {
+      return { label: "Start speaking", tab: "speaking" };
+    }
+    if (subtask.id === "review") {
+      return { label: "Review phrases", tab: "review" };
+    }
+    if (task.milestone) {
+      return { label: "Open milestone", tab: "progress", target: `milestone-${task.month}` };
+    }
+    if (task.checkIn) {
+      return { label: "Start diagnostic", tab: "speaking" };
+    }
+    if ((task.day - 1) % 7 === 5) {
+      return { label: "Open Linguno resources", tab: "resources", target: "resource-linguno" };
+    }
+    return {
+      label: `Open ${DATA.scenarios.find((scenario) => scenario.id === task.scenarioId)?.title || "scenario"}`,
+      tab: "scenarios",
+      scenarioId: task.scenarioId
+    };
+  }
+
+  function openDailyTaskDestination(button) {
+    const task = getCurrentTask();
+    const subtask = dailySubtasks(task).find((item) => item.id === button.dataset.taskId);
+    if (!subtask) return;
+    const action = dailyTaskAction(task, subtask);
+    setActiveTab(action.tab, true);
+    if (action.scenarioId) {
+      openScenario(action.scenarioId);
+      return;
+    }
+    if (!action.target) return;
+    const target = $(`[data-navigation-target="${action.target}"]`);
+    const details = target?.closest("details");
+    if (details) details.open = true;
+    target?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  function logRead2SpeakDailyActivity(session, status) {
+    const task = getCurrentTask();
+    const record = getDayRecord(task.day, true);
+    record.completedTasks = Array.from(new Set([...record.completedTasks, "read"]));
+    record.read2SpeakActivity = {
+      courseId: state.read2Speak.courseId,
+      unitNumber: state.read2Speak.currentUnit,
+      sessionId: session.id,
+      status
+    };
+    if (record.completedTasks.length === VALID_TASK_IDS.length) {
+      record.done = true;
+      record.completedDate = record.completedDate || localISO();
+    }
+  }
+
+  function defaultRead2SpeakReviewDate(confidence) {
+    const intervals = { 1: 3, 2: 3, 3: 7, 4: 14, 5: 30 };
+    return addDays(localISO(), intervals[confidence] || 7);
   }
 
   function languageTransferProgress() {
@@ -529,7 +644,8 @@
         done: false,
         hours: 0,
         notes: "",
-        completedDate: null
+        completedDate: null,
+        read2SpeakActivity: null
       };
     }
     return state.daily[key] || {
@@ -537,7 +653,8 @@
       done: false,
       hours: 0,
       notes: "",
-      completedDate: null
+      completedDate: null,
+      read2SpeakActivity: null
     };
   }
 
@@ -674,11 +791,18 @@
 
   function readProgress() {
     const course = currentRead2SpeakCourse();
-    const expected = course.units.length * DATA.read2SpeakCheckpoints.length;
+    const expected = course.units.reduce((sum, unit) => sum + unit.sessions.length, 0);
     const complete = course.units.reduce((sum, unit) =>
       sum + read2SpeakUnitProgress(course.id, unit.number).complete, 0
     );
-    return { complete, expected, percent: Math.round((complete / expected) * 100) };
+    const expectedByToday = Math.min(expected, planDayNumber());
+    return {
+      complete,
+      expected,
+      expectedByToday,
+      pacePercent: Math.round((complete / Math.max(1, expectedByToday)) * 100),
+      percent: Math.round((complete / expected) * 100)
+    };
   }
 
   function overallProgress() {
@@ -854,6 +978,9 @@
     const viewingDifferentDay = task.day !== todayDay;
     const tripDays = daysBetween(localISO(), state.settings.tripDate);
     const finalMode = tripDays >= 0 && tripDays <= 30;
+    const nonReadComplete = task.subtasks
+      .filter((item) => item.id !== "read")
+      .every((item) => record.completedTasks.includes(item.id));
 
     view.innerHTML = `
       ${viewHeader(
@@ -911,20 +1038,20 @@
           ${subtasks.map((subtask) => {
             const checked = record.completedTasks.includes(subtask.id);
             return `
-              <li class="task-item ${checked ? "completed" : ""}">
+              <li class="task-item daily-task-item ${checked ? "completed" : ""}">
                 <input class="task-check" id="task-${subtask.id}" type="checkbox"
-                  data-action="toggle-daily-task" data-task-id="${subtask.id}" ${checked ? "checked" : ""}>
+                  data-action="toggle-daily-task" data-task-id="${subtask.id}" ${checked ? "checked" : ""}
+                  ${subtask.id === "read" ? "disabled aria-describedby=\"read2speak-completion-note\"" : ""}>
                 <label class="task-copy" for="task-${subtask.id}">
                   <span class="task-title">${escapeHTML(subtask.title)} <span class="badge badge-muted">${subtask.minutes} min</span></span>
                   <span class="task-detail">${escapeHTML(subtask.detail)}</span>
                 </label>
+                <button class="button button-small button-secondary task-action" type="button"
+                  data-action="open-daily-task" data-task-id="${subtask.id}">${escapeHTML(dailyTaskAction(task, subtask).label)}</button>
               </li>
             `;
           }).join("")}
         </ul>
-        <div class="button-row" style="margin-top:.8rem">
-          <button class="button button-small button-secondary" type="button" data-action="go-tab" data-tab="resources">Open Read2Speak course</button>
-        </div>
       </section>
 
       <section class="grid grid-2" style="margin-top:.9rem">
@@ -962,10 +1089,20 @@
           </div>
         </div>
         <div class="button-row" style="margin-top:.9rem">
-          <button class="button" type="button" data-action="mark-day-done" ${isDayComplete(task.day) ? "disabled" : ""}>${isDayComplete(task.day) ? "All five steps complete" : "Complete all five steps"}</button>
+          <button class="button" type="button" data-action="mark-day-done" ${
+            isDayComplete(task.day) || (nonReadComplete && !record.completedTasks.includes("read")) ? "disabled" : ""
+          }>${
+            isDayComplete(task.day)
+              ? "All five steps complete"
+              : nonReadComplete && !record.completedTasks.includes("read")
+                ? "Finish Read2Speak to complete day"
+              : record.completedTasks.includes("read")
+                ? "Complete remaining steps"
+                : "Complete non-course steps"
+          }</button>
           ${isDayComplete(task.day) ? `<span class="badge">Completed ${formatDate(record.completedDate || localISO())}</span>` : ""}
         </div>
-        <p class="help-text" style="margin:.55rem 0 0">This records the daily checklist only. Read2Speak and Language Transfer progress changes in Resources when you complete the corresponding work.</p>
+        <p class="help-text" id="read2speak-completion-note" style="margin:.55rem 0 0">Read2Speak is completed from its session controls in Resources. A partial 15-minute session counts for today without advancing the course.</p>
       </section>
     `;
   }
@@ -1107,10 +1244,10 @@
     }
     const read = readProgress();
     if (read.percent < 75) {
-      const checkpoint = nextRead2SpeakCheckpoint();
+      const session = nextRead2SpeakSession();
       return {
-        action: checkpoint?.title || "Review your current Read2Speak unit",
-        reason: `${read.complete} of ${read.expected} course checkpoints are complete. One focused checkpoint is enough.`,
+        action: session?.title || "Review your current Read2Speak unit",
+        reason: `${read.complete} of ${read.expected} balanced course sessions are complete. One 15-minute session is enough.`,
         tab: "resources"
       };
     }
@@ -1345,7 +1482,7 @@
     const existing = new Set(state.deck.map((card) => card.id));
     const phrases = DATA.phrasebook.filter((phrase) =>
       !normalized ||
-      `${phrase.spanish} ${phrase.english} ${phrase.category}`.toLowerCase().includes(normalized)
+      `${phrase.spanish} ${phrase.english} ${phrase.category} ${phrase.useCase || ""} ${phrase.slot || ""}`.toLowerCase().includes(normalized)
     ).slice(0, normalized ? 30 : 8);
     return phrases.map((phrase) => `
       <div class="list-card">
@@ -1353,6 +1490,7 @@
           <div>
             <strong lang="es">${escapeHTML(phrase.spanish)}</strong>
             <p class="muted">${escapeHTML(phrase.english)} · ${escapeHTML(phrase.category)}</p>
+            ${phrase.useCase ? `<p class="help-text">Use it for: ${escapeHTML(phrase.useCase)}${phrase.slot ? ` · Personalise: ${escapeHTML(phrase.slot)}` : ""}</p>` : ""}
           </div>
           <button class="button button-small button-secondary" type="button" data-action="add-phrasebook" data-id="${phrase.id}" ${existing.has(phrase.id) ? "disabled" : ""}>
             ${existing.has(phrase.id) ? "Added" : "Add"}
@@ -1467,6 +1605,34 @@
     return exercise;
   }
 
+  function speakingVariation(exercise) {
+    const task = getCurrentTask();
+    const exerciseIndex = Math.max(0, DATA.speakingExercises.findIndex((item) => item.id === exercise.id));
+    const constraints = exercise.constraints || [];
+    const constraint = constraints.length
+      ? constraints[(task.week + exerciseIndex - 1) % constraints.length]
+      : "";
+    if (task.diagnostic) {
+      return {
+        title: `Week ${task.week} diagnostic: ${task.diagnostic.type}`,
+        family: task.diagnostic.type,
+        prompt: task.diagnostic.task,
+        targets: [
+          constraint,
+          `Afterwards, reflect: ${task.diagnostic.reflection}`
+        ].filter(Boolean),
+        followUps: exercise.followUps
+      };
+    }
+    return {
+      title: exercise.title,
+      family: exercise.family || "Speaking",
+      prompt: exercise.prompt,
+      targets: [...exercise.targets, constraint].filter(Boolean),
+      followUps: exercise.followUps
+    };
+  }
+
   function speakingMinutesForSession() {
     const activeSeconds = Math.max(0, timerSeconds - timerRemaining);
     return Math.max(1, Math.ceil((speakingElapsedSeconds + activeSeconds) / 60));
@@ -1500,6 +1666,7 @@
 
   function renderSpeaking() {
     const exercise = currentSpeakingExercise();
+    const variation = speakingVariation(exercise);
     const weekly = speakingMinutesThisWeek();
     const recent = state.speakingLogs.slice().sort((a, b) => b.date.localeCompare(a.date)).slice(0, 6);
     const timerStarted = timerRemaining < timerSeconds || Boolean(timerInterval);
@@ -1509,21 +1676,24 @@
       <section class="card card-accent speaking-session">
         <div class="card-header">
           <div>
-            <span class="badge">${speakingSessionComplete ? "Reflect" : passLabel}</span>
-            <h3>${escapeHTML(exercise.title)}</h3>
+            <div class="chip-row">
+              <span class="badge">${speakingSessionComplete ? "Reflect" : passLabel}</span>
+              <span class="badge badge-muted">${escapeHTML(variation.family)}</span>
+            </div>
+            <h3>${escapeHTML(variation.title)}</h3>
           </div>
           <button class="button button-small button-secondary" type="button" data-action="different-speaking-exercise">Different exercise</button>
         </div>
-        <p class="speaking-prompt">${escapeHTML(exercise.prompt)}</p>
+        <p class="speaking-prompt">${escapeHTML(variation.prompt)}</p>
 
         <div class="speaking-guidance">
           <div>
             <strong>Communication targets</strong>
-            <ul>${exercise.targets.map((target) => `<li>${escapeHTML(target)}</li>`).join("")}</ul>
+            <ul>${variation.targets.map((target) => `<li>${escapeHTML(target)}</li>`).join("")}</ul>
           </div>
           <div>
             <strong>Keep going with</strong>
-            <ul>${exercise.followUps.map((question) => `<li>${escapeHTML(question)}</li>`).join("")}</ul>
+            <ul>${variation.followUps.map((question) => `<li>${escapeHTML(question)}</li>`).join("")}</ul>
           </div>
         </div>
 
@@ -1560,7 +1730,7 @@
         ` : `
           <form class="speaking-reflection" id="speaking-log-form">
             <input type="hidden" name="exerciseId" value="${escapeHTML(exercise.id)}">
-            <input type="hidden" name="prompt" value="${escapeHTML(exercise.prompt)}">
+            <input type="hidden" name="prompt" value="${escapeHTML(variation.prompt)}">
             <input type="hidden" name="minutes" value="${speakingMinutesForSession()}">
             <input type="hidden" name="passes" value="${speakingPassOneComplete && speakingPass === 2 ? 2 : 1}">
             <div class="form-group">
@@ -1719,6 +1889,30 @@
     if (reset) timerRemaining = timerSeconds;
   }
 
+  function currentScenarioVariant(scenario) {
+    const month = getCurrentTask().month;
+    const levelsByMonth = [1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 5, 5];
+    const level = levelsByMonth[month - 1] || 1;
+    return scenario.variants?.find((variant) => variant.level === level) ||
+      scenario.variants?.[0] ||
+      {
+        level: 1,
+        title: "Core rehearsal",
+        instruction: "Complete the exchange clearly before revealing support.",
+        cues: scenario.cues,
+        complication: scenario.roleplay
+      };
+  }
+
+  function regionalScenarioContext() {
+    const country = state.settings.countries[0];
+    const note = country ? DATA.regionalNotes[country] : null;
+    if (!country || !note) {
+      return "Choose a route country in Settings, or imagine the exchange happening at your next likely destination.";
+    }
+    return `${country}: ${note.warning} Useful language to recognise: ${note.words.join("; ")}.`;
+  }
+
   function renderScenarios() {
     const avg = scenarioAverage();
     const completed = Object.values(state.scenarios).filter((item) => item.completed).length;
@@ -1758,12 +1952,14 @@
       <section class="scenario-list">
         ${DATA.scenarios.map((scenario) => {
           const progress = state.scenarios[scenario.id] || {};
+          const variant = currentScenarioVariant(scenario);
           return `
             <article class="card">
               <div class="list-card-header">
                 <div>
                   <div class="chip-row">
                     <span class="badge">${escapeHTML(scenario.category)}</span>
+                    <span class="badge badge-muted">Level ${variant.level}: ${escapeHTML(variant.title)}</span>
                     ${progress.completed ? `<span class="badge badge-accent">Completed</span>` : ""}
                   </div>
                   <h3 style="margin-top:.55rem">${escapeHTML(scenario.title)}</h3>
@@ -1784,6 +1980,7 @@
   function openScenario(id) {
     const scenario = DATA.scenarios.find((item) => item.id === id);
     if (!scenario) return;
+    const variant = currentScenarioVariant(scenario);
     const progress = state.scenarios[id] || { confidence: 3, completed: false, notes: "" };
     const lastPractised = progress.lastPractised
       ? `<span class="badge badge-muted">Last practised ${escapeHTML(formatDate(progress.lastPractised))}</span>`
@@ -1791,19 +1988,25 @@
     openModal(`
       <div class="modal-header">
         <div>
-          <div class="chip-row"><span class="badge">${escapeHTML(scenario.category)}</span>${lastPractised}</div>
+          <div class="chip-row">
+            <span class="badge">${escapeHTML(scenario.category)}</span>
+            <span class="badge badge-accent">Level ${variant.level}: ${escapeHTML(variant.title)}</span>
+            ${lastPractised}
+          </div>
           <h2 style="margin-top:.35rem">${escapeHTML(scenario.title)}</h2>
         </div>
         <button class="icon-button" type="button" data-action="close-modal" aria-label="Close">×</button>
       </div>
       <p>${escapeHTML(scenario.situation)}</p>
+      <p class="inline-note"><strong>This pass:</strong> ${escapeHTML(variant.instruction)}</p>
+      ${variant.level === 4 ? `<p class="inline-note"><strong>Route context:</strong> ${escapeHTML(regionalScenarioContext())}</p>` : ""}
       <section class="scenario-round" aria-labelledby="scenario-round-one">
         <span class="scenario-step" aria-hidden="true">1</span>
         <div>
           <h3 id="scenario-round-one">First pass: no help</h3>
           <p class="muted">Speak aloud. Join these ideas into one natural exchange before opening the support below.</p>
           <ol class="scenario-cues">
-            ${scenario.cues.map((cue) => `<li>${escapeHTML(cue)}</li>`).join("")}
+            ${variant.cues.map((cue) => `<li>${escapeHTML(cue)}</li>`).join("")}
           </ol>
         </div>
       </section>
@@ -1821,7 +2024,7 @@
         <div>
           <h3 id="scenario-round-two">Second pass: handle the complication</h3>
           <p class="muted">Play both roles. Keep going for at least three turns each, even if the wording is imperfect.</p>
-          <p><strong>Your complication:</strong> ${escapeHTML(scenario.roleplay)}</p>
+          <p><strong>Your complication:</strong> ${escapeHTML(variant.complication)}</p>
         </div>
       </section>
       <form id="scenario-form" class="stack scenario-reflection">
@@ -1902,10 +2105,10 @@
         : "Choose one 10-minute session at your current ladder stage.",
       tab: "resources"
     });
-    if (read.percent < 65 && current > 7) issues.push({
-      issue: `Read2Speak course progress is ${read.percent}%`,
+    if (read.complete + 4 < read.expectedByToday && current > 7) issues.push({
+      issue: `Read2Speak has ${read.complete} of ${read.expectedByToday} planned sessions`,
       why: "The paired eBook and workbook sequence provides the structured language progression behind the travel plan.",
-      action: "Complete the next course checkpoint only, then stop.",
+      action: "Complete the next 15-minute course session, then stop.",
       tab: "resources"
     });
     if (scenarioAverage() < 3 && Object.keys(state.scenarios).length) issues.push({
@@ -1965,7 +2168,7 @@
         <div class="card stack">
           <h3>Learning balance</h3>
           ${progressBar(Math.min(100, (hoursThisWeek() / state.settings.weeklyTargetHours) * 100), `Study time ${hoursThisWeek().toFixed(1)}/${state.settings.weeklyTargetHours} hours this week`)}
-          ${progressBar(read.percent, `Read2Speak course ${read.complete}/${read.expected} checkpoints`)}
+          ${progressBar(read.percent, `Read2Speak course ${read.complete}/${read.expected} sessions`)}
           ${progressBar(languageTransfer.percent, `Language Transfer ${languageTransfer.complete}/${languageTransfer.total} lessons`)}
           ${progressBar(Math.min(100, (listen / 90) * 100), `Listening ${listen} min this week`)}
           ${progressBar(Math.min(100, (speakingMinutesThisWeek() / 30) * 100), `Speaking ${speakingMinutesThisWeek()} min this week`)}
@@ -2016,7 +2219,7 @@
           ${DATA.milestones.map((milestone) => {
             const result = state.milestones[String(milestone.month)];
             return `
-              <details class="details" ${milestone.month === currentTask.month ? "open" : ""}>
+              <details class="details" data-navigation-target="milestone-${milestone.month}" ${milestone.month === currentTask.month ? "open" : ""}>
                 <summary>Month ${milestone.month}: ${escapeHTML(milestone.task)} ${result ? `· ${result.result === "pass" ? "Passed" : "Retry"}` : ""}</summary>
                 <div class="details-body">
                   <form class="milestone-form stack" data-month="${milestone.month}">
@@ -2068,25 +2271,91 @@
     `;
   }
 
+  function read2SpeakSessionLocation(session) {
+    if (!session) return "";
+    if (session.resource === "ebook") {
+      return `eBook PDF pages ${session.startPage}–${session.endPage}`;
+    }
+    if (session.exerciseStart) {
+      return `Workbook exercises ${session.exerciseStart}–${session.exerciseEnd} · start near PDF page ${session.startPage}`;
+    }
+    if (session.resource === "workbook") {
+      return `Workbook answer and retry section · start near PDF page ${session.startPage}`;
+    }
+    return "Use your notes; keep both PDFs closed for the first retrieval attempt";
+  }
+
+  function renderRead2SpeakSession(session, record, current = false) {
+    const status = record.sessionStatuses[session.id] || "not-started";
+    const selected = read2SpeakFiles[session.resource];
+    const canOpen = ["ebook", "workbook"].includes(session.resource) && selected;
+    return `
+      <article class="read2speak-session ${current ? "current" : ""} ${status === "complete" ? "completed" : ""}">
+        <div class="card-header">
+          <div>
+            <div class="chip-row">
+              <span class="badge">Session ${session.number}</span>
+              <span class="badge badge-muted">15 min</span>
+              ${status === "partial" ? `<span class="badge badge-accent">In progress</span>` : ""}
+              ${status === "complete" ? `<span class="badge badge-accent">Complete</span>` : ""}
+            </div>
+            <h3>${escapeHTML(session.title)}</h3>
+            <p class="muted">${escapeHTML(read2SpeakSessionLocation(session))}</p>
+          </div>
+        </div>
+        <ol class="session-steps">
+          <li><strong>Learn:</strong> ${escapeHTML(session.learn)}</li>
+          <li><strong>Retrieve:</strong> ${escapeHTML(session.retrieve)}</li>
+          <li><strong>Produce:</strong> ${escapeHTML(session.produce)}</li>
+          <li><strong>Capture:</strong> ${escapeHTML(session.capture)} ${escapeHTML(session.latinAmerica)}</li>
+        </ol>
+        <div class="button-row">
+          ${["ebook", "workbook"].includes(session.resource) ? `
+            <button class="button button-small button-secondary" type="button"
+              data-action="open-read2speak-pdf" data-resource="${session.resource}"
+              data-page="${session.startPage}" ${canOpen ? "" : "disabled"}>
+              Open ${session.resource === "ebook" ? "eBook" : "workbook"} page ${session.startPage}
+            </button>
+          ` : ""}
+          ${status !== "complete" ? `
+            <button class="button button-small button-secondary" type="button"
+              data-action="set-read2speak-session" data-session-id="${session.id}" data-status="partial">
+              Log partial
+            </button>
+            <button class="button button-small button-accent" type="button"
+              data-action="set-read2speak-session" data-session-id="${session.id}" data-status="complete">
+              Complete session
+            </button>
+          ` : `
+            <button class="button button-small button-secondary" type="button"
+              data-action="set-read2speak-session" data-session-id="${session.id}" data-status="incomplete">
+              Mark incomplete
+            </button>
+          `}
+        </div>
+      </article>
+    `;
+  }
+
   function renderRead2SpeakCourse() {
     const course = currentRead2SpeakCourse();
     const unit = currentRead2SpeakUnit();
     const record = getRead2SpeakUnitRecord(course.id, unit.number);
     const unitProgress = read2SpeakUnitProgress(course.id, unit.number);
     const courseProgress = readProgress();
-    const nextCheckpoint = nextRead2SpeakCheckpoint();
+    const nextSession = nextRead2SpeakSession();
     const unitComplete = unitProgress.complete === unitProgress.total;
     const canMoveNext = unit.number < course.units.length;
 
     return `
-      <section class="card card-accent read2speak-course">
+      <section class="card card-accent read2speak-course" data-navigation-target="read2speak">
         <div class="card-header">
           <div>
             <span class="badge badge-accent">Paired course</span>
             <h3 style="margin-top:.45rem">Read2Speak course workspace</h3>
-            <p class="muted">Study the eBook first, complete the matching workbook exercises in order, check answers, then review and retry.</p>
+            <p class="muted">Each 15-minute session combines learning, retrieval, production, and one captured takeaway.</p>
           </div>
-          <span class="badge">${courseProgress.complete}/${courseProgress.expected} checkpoints</span>
+          <span class="badge">${courseProgress.complete}/${courseProgress.expected} sessions</span>
         </div>
 
         <div class="grid grid-2">
@@ -2126,7 +2395,9 @@
           ${["ebook", "workbook"].map((resource) => {
             const selected = read2SpeakFiles[resource];
             const resourceLabel = resource === "ebook" ? "eBook" : "Workbook";
-            const page = unit[resource].startPage;
+            const page = nextSession?.resource === resource
+              ? nextSession.startPage
+              : unit[resource].startPage;
             return `
               <div class="list-card">
                 <strong>${resourceLabel}</strong>
@@ -2149,26 +2420,23 @@
 
         <div class="card-header course-next">
           <div>
-            <h3>${nextCheckpoint ? "Next checkpoint" : "Unit complete"}</h3>
-            <p class="muted">${nextCheckpoint ? escapeHTML(nextCheckpoint.title) : "All paired study, practice, correction, and activation checkpoints are complete."}</p>
+            <h3>${nextSession ? "Next balanced session" : "Unit complete"}</h3>
+            <p class="muted">${nextSession ? `Session ${nextSession.number}: ${escapeHTML(nextSession.title)}` : "All learning, practice, correction, and speaking sessions are complete."}</p>
           </div>
           ${unitComplete && canMoveNext ? `<button class="button button-small button-accent" type="button" data-action="next-read2speak-unit">Start Unit ${unit.number + 1}</button>` : ""}
         </div>
 
-        <div class="task-list course-checkpoints">
-          ${DATA.read2SpeakCheckpoints.map((checkpoint) => {
-            const checked = record.completedCheckpoints.includes(checkpoint.id);
-            return `
-              <label class="task-item ${checked ? "completed" : ""}">
-                <input class="task-check" type="checkbox" data-action="toggle-read2speak-checkpoint"
-                  data-checkpoint-id="${checkpoint.id}" ${checked ? "checked" : ""}>
-                <span class="task-copy">
-                  <span class="task-title">${escapeHTML(checkpoint.title)} <span class="badge badge-muted">${escapeHTML(checkpoint.resource)}</span></span>
-                  <span class="task-detail">${escapeHTML(checkpoint.detail)}</span>
-                </span>
-              </label>
-            `;
-          }).join("")}
+        <div class="course-sessions">
+          ${nextSession
+            ? renderRead2SpeakSession(nextSession, record, true)
+            : `<p class="inline-note">This unit is complete. Use the scheduled review date to test delayed retrieval.</p>`
+          }
+          <details class="details">
+            <summary>View all 16 unit sessions</summary>
+            <div class="details-body course-session-list">
+              ${unit.sessions.map((session) => renderRead2SpeakSession(session, record)).join("")}
+            </div>
+          </details>
         </div>
 
         <div class="grid grid-2 course-reflection">
@@ -2186,7 +2454,7 @@
               <label for="read2speak-review-date">Review again</label>
               <input class="input" id="read2speak-review-date" type="date" value="${record.reviewDate || ""}" data-action="read2speak-review-date">
             </div>
-            <p class="help-text">${record.lastStudied ? `Last studied ${formatDate(record.lastStudied)}.` : "No checkpoint has been completed yet."}</p>
+            <p class="help-text">${record.lastStudied ? `Last studied ${formatDate(record.lastStudied)}.` : "No course session has been logged yet."}</p>
           </div>
         </div>
       </section>
@@ -2220,7 +2488,7 @@
     const notes = state.languageTransfer.notes[String(lesson)] || "";
 
     return `
-      <section class="card card-accent language-transfer-course">
+      <section class="card card-accent language-transfer-course" data-navigation-target="language-transfer">
         <div class="card-header">
           <div>
             <span class="badge badge-accent">90-lesson audio course</span>
@@ -2289,7 +2557,7 @@
       ${renderLanguageTransferCourse()}
       <section class="grid grid-2">
         ${DATA.resources.map((resource) => `
-          <article class="card">
+          <article class="card" data-navigation-target="resource-${resource.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}">
             <h3>${escapeHTML(resource.title)}</h3>
             <p class="muted">${escapeHTML(resource.description)}</p>
             <div class="button-row">
@@ -2348,7 +2616,11 @@
             <summary>${escapeHTML(category)}</summary>
             <div class="details-body">
               ${DATA.phrasebook.filter((phrase) => phrase.category === category).map((phrase) => `
-                <p><strong lang="es">${escapeHTML(phrase.spanish)}</strong><br><span class="muted">${escapeHTML(phrase.english)}</span></p>
+                <p>
+                  <strong lang="es">${escapeHTML(phrase.spanish)}</strong><br>
+                  <span class="muted">${escapeHTML(phrase.english)}</span>
+                  ${phrase.useCase ? `<br><span class="help-text">Use it for: ${escapeHTML(phrase.useCase)}${phrase.slot ? ` · Personalise: ${escapeHTML(phrase.slot)}` : ""}</span>` : ""}
+                </p>
               `).join("")}
             </div>
           </details>
@@ -2698,6 +2970,7 @@
     const action = button.dataset.action;
 
     if (action === "go-tab") setActiveTab(button.dataset.tab, true);
+    if (action === "open-daily-task") openDailyTaskDestination(button);
     if (action === "build-session") {
       quickSession = buildQuickSession(Number(button.dataset.minutes));
       renderToday();
@@ -2742,6 +3015,35 @@
       saveState(`Unit ${state.read2Speak.currentUnit} is ready.`);
       renderResources();
       $(".read2speak-course")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+    if (action === "set-read2speak-session") {
+      const unit = currentRead2SpeakUnit();
+      const session = unit.sessions.find((item) => item.id === button.dataset.sessionId);
+      if (!session) return;
+      const record = getRead2SpeakUnitRecord(state.read2Speak.courseId, unit.number, true);
+      const status = button.dataset.status;
+      if (status === "incomplete") {
+        delete record.sessionStatuses[session.id];
+      } else if (["partial", "complete"].includes(status)) {
+        record.sessionStatuses[session.id] = status;
+        record.lastStudied = localISO();
+        logRead2SpeakDailyActivity(session, status);
+        if (
+          status === "complete" &&
+          session.id === unit.sessions.at(-1).id &&
+          unit.sessions.every((item) => record.sessionStatuses[item.id] === "complete") &&
+          !record.reviewDate
+        ) {
+          record.reviewDate = defaultRead2SpeakReviewDate(record.confidence);
+        }
+      }
+      const message = status === "complete"
+        ? "Read2Speak session complete."
+        : status === "partial"
+          ? "Fifteen minutes logged. Continue this session next time."
+          : "Session marked incomplete.";
+      saveState(message);
+      renderResources();
     }
     if (action === "open-language-transfer-lesson") {
       state.languageTransfer.currentLesson = clamp(
@@ -2789,11 +3091,17 @@
     if (action === "mark-day-done") {
       const task = getCurrentTask();
       const record = getDayRecord(task.day, true);
-      record.completedTasks = task.subtasks.map((item) => item.id);
-      record.done = true;
-      record.completedDate = localISO();
+      record.completedTasks = Array.from(new Set([
+        ...record.completedTasks,
+        ...task.subtasks.filter((item) => item.id !== "read").map((item) => item.id)
+      ]));
+      record.done = record.completedTasks.length === VALID_TASK_IDS.length;
+      record.completedDate = record.done ? localISO() : null;
       if (!record.hours) record.hours = Number((task.targetMinutes / 60).toFixed(1));
-      saveState("Day marked complete.");
+      saveState(record.done
+        ? "Day marked complete."
+        : "Non-course steps complete. Finish a Read2Speak session to complete the day."
+      );
       renderToday();
     }
     if (action === "reveal-review") {
@@ -2906,6 +3214,12 @@
       const task = getCurrentTask();
       const record = getDayRecord(task.day, true);
       record.completedTasks = Array.from(new Set([...record.completedTasks, "read", "speak", "review"]));
+      record.read2SpeakActivity = {
+        courseId: state.read2Speak.courseId,
+        unitNumber: state.read2Speak.currentUnit,
+        sessionId: nextRead2SpeakSession()?.id || "",
+        status: "fallback"
+      };
       record.hours = Number((Number(record.hours || 0) + 0.1).toFixed(1));
       record.notes = record.notes ? `${record.notes}\nCompleted 5-minute fallback.` : "Completed 5-minute fallback.";
       saveState("Fallback logged. Small and useful.");
@@ -2976,24 +3290,6 @@
       );
       renderResources();
     }
-    if (action === "toggle-read2speak-checkpoint") {
-      const record = getRead2SpeakUnitRecord(state.read2Speak.courseId, state.read2Speak.currentUnit, true);
-      const id = input.dataset.checkpointId;
-      if (input.checked) {
-        record.completedCheckpoints = Array.from(new Set([...record.completedCheckpoints, id]));
-        record.lastStudied = localISO();
-        const todayRecord = getDayRecord(planDayNumber(), true);
-        todayRecord.completedTasks = Array.from(new Set([...todayRecord.completedTasks, "read"]));
-        if (todayRecord.completedTasks.length === VALID_TASK_IDS.length) {
-          todayRecord.done = true;
-          todayRecord.completedDate = localISO();
-        }
-      } else {
-        record.completedCheckpoints = record.completedCheckpoints.filter((checkpointId) => checkpointId !== id);
-      }
-      saveState(input.checked ? "Course checkpoint complete." : "");
-      renderResources();
-    }
     if (action === "read2speak-confidence") {
       const record = getRead2SpeakUnitRecord(state.read2Speak.courseId, state.read2Speak.currentUnit, true);
       record.confidence = clamp(Number(input.value), 1, 5);
@@ -3015,6 +3311,7 @@
       else saveState();
     }
     if (action === "toggle-daily-task") {
+      if (input.dataset.taskId === "read") return;
       const task = getCurrentTask();
       const record = getDayRecord(task.day, true);
       if (input.checked) {
@@ -3284,7 +3581,7 @@
         preferredSessionMinutes: Number(formData.get("preferredSessionMinutes"))
       };
       const hasCourseProgress = Object.values(state.read2Speak.units)
-        .some((record) => record.completedCheckpoints.length);
+        .some((record) => Object.keys(record.sessionStatuses || {}).length);
       if (!hasCourseProgress) {
         const courseByLevel = {
           beginner: "foundations",

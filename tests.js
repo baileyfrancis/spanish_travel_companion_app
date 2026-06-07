@@ -160,7 +160,7 @@
 
   const previousState = localStorage.getItem("spanishTravelCompanionState");
   const frame = document.createElement("iframe");
-  frame.hidden = true;
+  frame.style.cssText = "position:fixed;left:0;top:0;width:390px;height:844px;border:0;visibility:hidden;pointer-events:none";
   document.body.appendChild(frame);
 
   function waitFor(check, timeout = 4000) {
@@ -197,10 +197,25 @@
   try {
     localStorage.removeItem("spanishTravelCompanionState");
     let appDocument = await loadFrame("#today");
+    await waitFor(() => frame.contentWindow.innerWidth > 0);
     await waitFor(() => appDocument.querySelector("#onboarding-form"));
 
     test("Mobile navigation exposes five primary destinations", () => {
       equal(appDocument.querySelectorAll(".bottom-nav .nav-item").length, 5);
+    });
+    test("Each week keeps one scenario across its daily travel steps", () => {
+      const tasks = frame.contentWindow.APP_DATA.dailyTasks;
+      const scenarioIdsInCatalogue = new Set(frame.contentWindow.APP_DATA.scenarios.map((scenario) => scenario.id));
+      for (let index = 0; index < tasks.length; index += 7) {
+        const week = tasks.slice(index, index + 7);
+        const scenarioIds = new Set(week.map((task) => task.scenarioId));
+        if (scenarioIds.size !== 1) {
+          throw new Error(`Week ${week[0].week} uses more than one scenario`);
+        }
+        if (!scenarioIdsInCatalogue.has(week[0].scenarioId)) {
+          throw new Error(`Week ${week[0].week} references a missing scenario`);
+        }
+      }
     });
     test("Update banner stays hidden until a new service worker is ready", () => {
       const banner = appDocument.querySelector("#update-banner");
@@ -222,6 +237,83 @@
       });
       equal(migrated.settings.onboardingComplete, true);
     });
+    test("Legacy Read2Speak checkpoints migrate to balanced sessions", () => {
+      const migrated = frame.contentWindow.APP_TEST_API.normalizeState({
+        version: 6,
+        settings: {
+          startDate: "2026-01-01",
+          tripDate: "2027-01-01",
+          weeklyTargetHours: 5,
+          countries: [],
+          theme: "system"
+        },
+        deck: [],
+        read2Speak: {
+          courseId: "foundations",
+          currentUnit: 1,
+          units: {
+            "foundations:1": {
+              completedCheckpoints: ["ebook-introduction", "workbook-1-8"],
+              confidence: 3
+            }
+          }
+        }
+      });
+      const statuses = migrated.read2Speak.units["foundations:1"].sessionStatuses;
+      equal([statuses["ebook-1"], statuses["workbook-1"], statuses["workbook-2"]], [
+        "complete",
+        "complete",
+        "complete"
+      ]);
+    });
+    test("Every Read2Speak unit has balanced active sessions", () => {
+      frame.contentWindow.APP_DATA.read2SpeakCourses.forEach((course) => {
+        course.units.forEach((unit) => {
+          equal(unit.sessions.length, 16);
+          unit.sessions.forEach((session) => {
+            if (
+              session.minutes !== 15 ||
+              !session.learn ||
+              !session.retrieve ||
+              !session.produce ||
+              !session.capture ||
+              !session.latinAmerica
+            ) {
+              throw new Error(`${course.title} Unit ${unit.number} has an incomplete session`);
+            }
+            if (["ebook", "workbook"].includes(session.resource) && !Number.isInteger(session.startPage)) {
+              throw new Error(`${course.title} Unit ${unit.number} has no PDF destination`);
+            }
+            if (
+              session.resource === "ebook" &&
+              (
+                session.startPage < unit.ebook.startPage ||
+                session.endPage > unit.ebook.endPage ||
+                session.endPage < session.startPage
+              )
+            ) {
+              throw new Error(`${course.title} Unit ${unit.number} has an invalid eBook range`);
+            }
+            if (
+              session.resource === "workbook" &&
+              (session.startPage < unit.workbook.startPage || session.startPage > unit.workbook.endPage)
+            ) {
+              throw new Error(`${course.title} Unit ${unit.number} has an invalid workbook destination`);
+            }
+          });
+        });
+      });
+    });
+    test("Daily task minute allocations match their displayed targets", () => {
+      frame.contentWindow.APP_DATA.dailyTasks.forEach((task) => {
+        equal(
+          task.subtasks.reduce((sum, item) => sum + item.minutes, 0),
+          task.targetMinutes,
+          `Day ${task.day} minute allocation does not match its target`
+        );
+        equal(task.subtasks.find((item) => item.id === "read").minutes, 15);
+      });
+    });
     test("First-run dialog stays within the viewport", () => {
       const rect = appDocument.querySelector(".modal").getBoundingClientRect();
       if (rect.left < 0 || rect.right > frame.contentWindow.innerWidth) {
@@ -235,6 +327,87 @@
       const saved = JSON.parse(localStorage.getItem("spanishTravelCompanionState"));
       equal(saved.settings.onboardingComplete, true);
     });
+
+    test("Every daily step has a destination button", () => {
+      equal(appDocument.querySelectorAll('[data-action="open-daily-task"]').length, 5);
+    });
+    test("Daily action buttons fit a phone viewport with comfortable tap targets", () => {
+      [...appDocument.querySelectorAll('[data-action="open-daily-task"]')].forEach((button) => {
+        const rect = button.getBoundingClientRect();
+        if (rect.left < 0 || rect.right > frame.contentWindow.innerWidth) {
+          throw new Error(`${button.textContent.trim()} overflows the phone viewport`);
+        }
+        if (rect.height < 44) {
+          throw new Error(`${button.textContent.trim()} is shorter than 44px`);
+        }
+      });
+    });
+    test("Scenario previews explain where the included vocabulary lives", () => {
+      const travelStep = appDocument.querySelector('[data-action="open-daily-task"][data-task-id="travel"]')
+        ?.closest(".daily-task-item");
+      if (!travelStep?.textContent.includes("in the app") || !travelStep.textContent.includes("Reveal phrase support")) {
+        throw new Error("The travel step does not explain where to find its vocabulary");
+      }
+    });
+
+    appDocument.querySelector('[data-action="open-daily-task"][data-task-id="read"]').click();
+    await waitFor(() => appDocument.querySelector('[data-navigation-target="read2speak"]'));
+    test("The reading step opens the Read2Speak workspace", () => {
+      equal(frame.contentWindow.location.hash, "#resources");
+    });
+    test("The current Read2Speak session combines active learning steps", () => {
+      const current = appDocument.querySelector(".read2speak-session.current");
+      ["Learn:", "Retrieve:", "Produce:", "Capture:"].forEach((label) => {
+        if (!current?.textContent.includes(label)) throw new Error(`Missing ${label}`);
+      });
+      if (!current.textContent.includes("Latin America") && !current.textContent.includes("route-country")) {
+        throw new Error("Missing Latin America adaptation");
+      }
+    });
+
+    appDocument.querySelector('.read2speak-session.current [data-status="partial"]').click();
+    await waitFor(() => appDocument.querySelector(".read2speak-session.current")?.textContent.includes("In progress"));
+    test("A partial session counts today without advancing the course", () => {
+      const updated = JSON.parse(localStorage.getItem("spanishTravelCompanionState"));
+      equal(updated.read2Speak.units["foundations:1"].sessionStatuses["ebook-1"], "partial");
+      equal(updated.daily["1"].read2SpeakActivity.status, "partial");
+      if (!updated.daily["1"].completedTasks.includes("read")) {
+        throw new Error("Partial session did not complete today's reading activity");
+      }
+      if (!appDocument.querySelector(".read2speak-session.current")?.textContent.includes("Session 1")) {
+        throw new Error("Partial work advanced to the next session");
+      }
+    });
+
+    appDocument.querySelector('.read2speak-session.current [data-status="complete"]').click();
+    await waitFor(() => appDocument.querySelector(".read2speak-session.current")?.textContent.includes("Session 2"));
+    test("Completing a session advances both course and daily progress", () => {
+      const updated = JSON.parse(localStorage.getItem("spanishTravelCompanionState"));
+      equal(updated.read2Speak.units["foundations:1"].sessionStatuses["ebook-1"], "complete");
+      equal(updated.daily["1"].read2SpeakActivity.status, "complete");
+    });
+
+    frame.contentWindow.location.hash = "today";
+    await waitFor(() => appDocument.querySelector("#view-title")?.textContent === "Today");
+    test("Daily Read2Speak completion is controlled by the course workspace", () => {
+      const checkbox = appDocument.querySelector('[data-task-id="read"]');
+      if (!checkbox?.disabled || !checkbox.checked) {
+        throw new Error("Expected a disabled, course-completed daily checkbox");
+      }
+    });
+    const scenarioButton = appDocument.querySelector('[data-action="open-daily-task"][data-task-id="travel"]');
+    const expectedScenarioTitle = scenarioButton.textContent.trim().replace(/^Open /, "");
+    scenarioButton.click();
+    await waitFor(() => appDocument.querySelector("#scenario-form"));
+    test("The travel step opens its named scenario directly", () => {
+      equal(appDocument.querySelector(".modal-header h2")?.textContent, expectedScenarioTitle);
+      if (!appDocument.querySelector(".scenario-support")?.textContent.includes("Key vocabulary")) {
+        throw new Error("The opened scenario is missing its included vocabulary");
+      }
+    });
+    appDocument.querySelector('[data-action="close-modal"]').click();
+    frame.contentWindow.location.hash = "today";
+    await waitFor(() => appDocument.querySelector("#view-title")?.textContent === "Today");
 
     appDocument.querySelector('[data-action="build-session"][data-minutes="15"]').click();
     await waitFor(() => appDocument.querySelector(".quick-session-plan"));
@@ -267,16 +440,19 @@
       }
     });
     test("Expanded phrasebook covers practical travel situations", () => {
-      if (frame.contentWindow.APP_DATA.phrasebook.length < 100) {
-        throw new Error("Expected at least 100 travel phrases");
+      if (frame.contentWindow.APP_DATA.phrasebook.length < 190) {
+        throw new Error("Expected at least 190 travel phrases");
       }
       const categories = new Set(frame.contentWindow.APP_DATA.phrasebook.map((phrase) => phrase.category));
       ["Airport", "Transport", "Accommodation", "Food", "Health", "Safety", "Bookings"]
         .forEach((category) => {
           if (!categories.has(category)) throw new Error(`Missing ${category} phrases`);
         });
+      if (frame.contentWindow.APP_DATA.phrasebook.filter((phrase) => phrase.useCase).length < 70) {
+        throw new Error("Expected phrase chains with practical use notes");
+      }
     });
-    test("Every travel scenario includes active-recall cues", () => {
+    test("Every travel scenario includes progressive active-recall variants", () => {
       if (frame.contentWindow.APP_DATA.scenarios.length < 22) {
         throw new Error("Expected at least 22 practical travel scenarios");
       }
@@ -284,7 +460,24 @@
         if (!Array.isArray(scenario.cues) || scenario.cues.length < 3) {
           throw new Error(`${scenario.title} is missing recall cues`);
         }
+        if (!Array.isArray(scenario.variants) || scenario.variants.length < 5) {
+          throw new Error(`${scenario.title} is missing progressive variants`);
+        }
+        scenario.variants.forEach((variant) => {
+          if (!variant.title || variant.cues.length < 3 || !variant.complication) {
+            throw new Error(`${scenario.title} has an incomplete variant`);
+          }
+        });
       });
+    });
+    test("The full year has distinct weekly diagnostics and rotating checklist cues", () => {
+      const data = frame.contentWindow.APP_DATA;
+      equal(data.weeklyDiagnostics.length, 52);
+      equal(new Set(data.weeklyDiagnostics.map((item) => item.task)).size, 52);
+      const speakingCues = new Set(data.dailyTasks.map((task) => task.microFocus?.speak));
+      if (speakingCues.size < 8) {
+        throw new Error("Expected at least eight rotating speaking checklist cues");
+      }
     });
     test("Scenario catalogue covers common travel pressure points", () => {
       const scenarioIds = new Set(frame.contentWindow.APP_DATA.scenarios.map((scenario) => scenario.id));
@@ -388,7 +581,14 @@
         throw new Error("Expected at least 30 speaking exercises");
       }
       frame.contentWindow.APP_DATA.speakingExercises.forEach((exercise) => {
-        if (!exercise.id || exercise.targets.length < 2 || exercise.followUps.length < 2 || exercise.support.length < 2) {
+        if (
+          !exercise.id ||
+          exercise.targets.length < 2 ||
+          exercise.followUps.length < 2 ||
+          exercise.support.length < 2 ||
+          exercise.constraints.length < 4 ||
+          !exercise.family
+        ) {
           throw new Error(`${exercise.title || exercise.id} is incomplete`);
         }
       });

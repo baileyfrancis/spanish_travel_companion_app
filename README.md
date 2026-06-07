@@ -7,9 +7,9 @@ The app uses plain HTML, CSS, and JavaScript. It has no backend, account, build 
 ## Features
 
 - 52-week, 364-day learning plan across 12 monthly phases
-- Paired Read2Speak eBook/workbook tracker across A1–A2, B1–B2, and C1–C2
+- Balanced 15-minute Read2Speak sessions across A1–A2, B1–B2, and C1–C2
 - Complete 90-lesson Language Transfer Spanish course tracker
-- Daily Read2Speak, listening, speaking, phrase review, and scenario tasks
+- Daily Read2Speak, listening, speaking, phrase review, and scenario tasks with rotating micro-focus cues
 - Linguno conjugation, listening, word-flashcard, and crossword practice woven into the weekly plan
 - StudySpanish pronunciation, grammar, vocabulary, verb drills, and travel material matched to each learning phase
 - Smart "What should I do now?" recommendation
@@ -20,9 +20,10 @@ The app uses plain HTML, CSS, and JavaScript. It has no backend, account, build 
 - Spaced-repetition phrase deck with active English-to-Spanish recall and optional reverse prompts
 - Guided Again, Hard, Good, and Easy ratings with exact schedules, same-session retry, and undo
 - Overdue-first review batches with configurable sizes, retry counts, keyboard controls, and outcome summaries
-- Custom phrases, a 120-phrase practical travel phrasebook, phrase management, and Anki-friendly CSV export
-- Speaking prompts, 1/2/5-minute timer, reflection log, and weekly minutes
-- Twenty-two practical two-pass travel rehearsals with recall cues, complications, notes, confidence tracking, and phrase capture
+- Custom phrases, an over-200-phrase practical travel phrasebook with use notes and personalisation slots, phrase management, and Anki-friendly CSV export
+- Speaking prompt families with rotating constraints, 1/2/5-minute timer, reflection log, and weekly minutes
+- Twenty-two practical travel rehearsals with five progressive levels, recall cues, complications, regional route passes, notes, confidence tracking, and phrase capture
+- Fifty-two active weekly diagnostics covering fluency, listening recovery, phrase recall, and scenario pressure
 - Progress, activity-date streaks, achievements, weakness detection, and monthly milestones
 - Scheduled Read2Speak reviews and stale-scenario follow-up recommendations
 - Listening ladder and curated free-resource links
@@ -85,14 +86,14 @@ The app stores:
 - Speaking logs
 - Scenario confidence and notes
 - Monthly milestone results
-- Read2Speak course, unit, checkpoints, notes, confidence, and review dates
+- Read2Speak course, unit, session status, notes, confidence, and review dates
 - Language Transfer current lesson, completion history, and lesson notes
 - Final-prep completion
 - Achievements
 
-Daily checklist completion and course progression are tracked separately. Completing all five
-daily steps does not automatically advance Read2Speak or Language Transfer; those course records
-change when their controls in **Resources** are completed.
+Read2Speak daily completion is controlled by the course workspace. Completing or time-boxing a
+session records the daily reading step; only a completed session advances course progress.
+Language Transfer progression continues to use its controls in **Resources**.
 
 No data is sent to a server. Private or sensitive travel information should not be entered into notes.
 
@@ -124,7 +125,14 @@ The service worker uses a versioned cache in `service-worker.js`. When deploying
 
 ## Read2Speak PDFs
 
-The course workspace follows the recommended sequence: study the matching eBook unit, complete all 25 workbook exercises in order, check the answer key, then review and retry weak work.
+Each unit is divided into 16 balanced sessions. Every session combines a small learning target,
+closed-book retrieval, original production, and one captured takeaway. The sequence moves through
+the eBook in page ranges, completes workbook exercises in groups of four or five, checks and retries
+weak work, then finishes with speaking activation and an automatically scheduled review.
+
+A partial session records 15 minutes of useful daily work without advancing past unfinished
+material. Each session also asks the learner to identify Spain-only language and retain a neutral
+or route-country alternative for Latin America.
 
 Licensed PDFs remain on the learner's device. Select the eBook and workbook in **Resources > Read2Speak course workspace** to open the current unit at its starting page. The files are not uploaded, placed in `localStorage`, or cached by the service worker.
 

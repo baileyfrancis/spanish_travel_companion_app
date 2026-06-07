@@ -510,6 +510,17 @@ h3 {
   background: color-mix(in srgb, var(--surface) 82%, var(--surface-2));
 }
 
+.daily-task-item {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) auto;
+}
+
+.task-action {
+  min-height: 44px;
+  align-self: center;
+  white-space: nowrap;
+}
+
 .task-item.completed {
   opacity: 0.7;
 }
@@ -546,6 +557,18 @@ h3 {
 .task-detail,
 .help-text {
   font-size: 0.84rem;
+}
+
+@media (max-width: 560px) {
+  .daily-task-item {
+    grid-template-columns: 24px minmax(0, 1fr);
+  }
+
+  .daily-task-item .task-action {
+    grid-column: 2;
+    justify-self: start;
+    white-space: normal;
+  }
 }
 
 .form-group {
@@ -1358,7 +1381,7 @@ td {
 .course-warning,
 .course-files,
 .course-next,
-.course-checkpoints,
+.course-sessions,
 .course-reflection {
   margin-top: 1rem;
 }
@@ -1370,6 +1393,52 @@ td {
 
 .course-files .list-card p {
   margin-bottom: 0.75rem;
+}
+
+.course-sessions {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.course-session-list {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.read2speak-session {
+  padding: 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+}
+
+.read2speak-session.current {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+.read2speak-session.completed {
+  background: color-mix(in srgb, var(--surface) 82%, var(--surface-2));
+}
+
+.read2speak-session h3 {
+  margin: 0.45rem 0 0.2rem;
+}
+
+.session-steps {
+  display: grid;
+  gap: 0.45rem;
+  margin: 0.8rem 0;
+  padding-left: 1.25rem;
+}
+
+.session-steps li {
+  padding-left: 0.15rem;
+  color: var(--muted);
+}
+
+.session-steps strong {
+  color: var(--text);
 }
 
 .file-button {

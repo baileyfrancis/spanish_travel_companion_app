@@ -124,7 +124,7 @@
       listen: "Complete focused listening at your current ladder stage. Replay one short section.",
       speak: "Shadow 5 sentences, then answer today’s prompt aloud.",
       review: "Review due phrases, then complete a short Linguno conjugation drill using this week’s tense.",
-      travel: "Preview this week’s scenario vocabulary."
+      travel: "Open this week’s named scenario in the app and preview Key vocabulary under Reveal phrase support."
     },
     {
       label: "Build",
@@ -140,7 +140,7 @@
       listen: "Do the week’s longest listening session, using Linguno or your listening ladder. Note 3 sounds or chunks you catch.",
       speak: "Shadow a short clip and record one uninterrupted minute.",
       review: "Review due phrases, saying every Spanish answer aloud.",
-      travel: "Listen for the week’s scenario vocabulary in context."
+      travel: "Open this week’s named scenario in the app, review its phrase support, then notice those words in today’s listening."
     },
     {
       label: "Use",
@@ -191,16 +191,97 @@
     return guidance[0] === taskType ? `${detail} ${guidance[1]}` : detail;
   }
 
-  const weeklyCheckIns = [
-    "What can you now say without translating first?",
-    "Which sound or listening pattern still slows you down?",
-    "Which five phrases would be most useful tomorrow in Latin America?",
-    "Can you ask a follow-up question instead of ending the conversation?",
-    "What did you avoid this week, and what is the smallest way to practise it?",
-    "Which study activity produced the clearest real-world improvement?",
-    "Can you explain one simple problem and ask for a solution?",
-    "What should next week contain less of, and more of?"
+  const diagnosticRotations = [
+    {
+      type: "Speaking fluency",
+      task: "Speak for two minutes without notes. Use the week’s theme, one repair phrase, and one follow-up question.",
+      reflection: "Where did your Spanish keep moving, and where did it stall?"
+    },
+    {
+      type: "Listening recovery",
+      task: "Replay a short clip, catch five useful words, then explain the gist aloud in simple Spanish.",
+      reflection: "Which sounds, speeds, or accents made comprehension drop?"
+    },
+    {
+      type: "Phrase recall",
+      task: "Recall ten practical phrases from this week, then use three of them in one realistic exchange.",
+      reflection: "Which phrases are ready for travel, and which still need spaced review?"
+    },
+    {
+      type: "Scenario pressure",
+      task: "Run the week’s scenario with a complication, no script, and at least three turns on each side.",
+      reflection: "What would make this situation easier in real life next week?"
+    }
   ];
+
+  const weeklyDiagnostics = Array.from({ length: 52 }, (_, index) => {
+    const theme = weeklyThemes[Math.floor(index / 4) % weeklyThemes.length];
+    const rotation = diagnosticRotations[index % diagnosticRotations.length];
+    return {
+      week: index + 1,
+      theme,
+      type: rotation.type,
+      task: `${rotation.task} Theme: ${theme}.`,
+      reflection: rotation.reflection
+    };
+  });
+
+  const weeklyCheckIns = weeklyDiagnostics.map((diagnostic) =>
+    `${diagnostic.type}: ${diagnostic.task} ${diagnostic.reflection}`
+  );
+
+  const checklistVariants = {
+    read: [
+      "Freshness cue: underline one phrase you can reuse today.",
+      "Freshness cue: turn one example into a sentence about your route.",
+      "Freshness cue: read the hardest sentence twice, once slowly and once naturally.",
+      "Freshness cue: close the page and reconstruct the key idea from memory.",
+      "Freshness cue: mine one phrase for a real person you might meet.",
+      "Freshness cue: note one grammar pattern as a travel function, not a rule.",
+      "Freshness cue: say the current dialogue with calmer rhythm than yesterday.",
+      "Freshness cue: choose one weak point to revisit at the end of the week."
+    ],
+    listen: [
+      "Freshness cue: listen once for gist, once for exact reusable chunks.",
+      "Freshness cue: write three words you heard without pausing the audio.",
+      "Freshness cue: shadow one sentence at natural volume.",
+      "Freshness cue: replay a difficult ten-second section until the rhythm is clearer.",
+      "Freshness cue: summarise the clip in one simple Spanish sentence.",
+      "Freshness cue: notice one regional or informal word without trying to memorise everything.",
+      "Freshness cue: catch one question form you could ask during travel.",
+      "Freshness cue: compare what is easier to hear now than last month."
+    ],
+    speak: [
+      "Freshness cue: answer once slowly, then again with fewer pauses.",
+      "Freshness cue: include one reason with porque and one follow-up question.",
+      "Freshness cue: recover from one missing word instead of restarting.",
+      "Freshness cue: make the answer about a real stop on your route.",
+      "Freshness cue: use past, present, or future time clearly.",
+      "Freshness cue: speak as if you are talking to hostel staff, not a teacher.",
+      "Freshness cue: finish with a polite closing phrase.",
+      "Freshness cue: repeat the same idea more simply and more naturally."
+    ],
+    review: [
+      "Freshness cue: say each answer aloud before revealing it.",
+      "Freshness cue: add one follow-up sentence after three reviewed phrases.",
+      "Freshness cue: suspend anything that is not useful for travel.",
+      "Freshness cue: mark one phrase you want available under pressure.",
+      "Freshness cue: turn one isolated phrase into a tiny exchange.",
+      "Freshness cue: review the hardest cards standing up and speaking clearly.",
+      "Freshness cue: notice whether the problem is meaning, sound, or word order.",
+      "Freshness cue: add no more than one new phrase unless the due pile is light."
+    ],
+    travel: [
+      "Freshness cue: add a destination, price, time, or personal need.",
+      "Freshness cue: handle one unexpected answer before you look at support.",
+      "Freshness cue: repeat the exchange with a more polite version.",
+      "Freshness cue: include one repair phrase if the other person speaks too fast.",
+      "Freshness cue: make the scenario specific to one country on your route.",
+      "Freshness cue: finish by confirming what you understood.",
+      "Freshness cue: run it once with notes, then once from memory.",
+      "Freshness cue: save the phrase that slowed you down most."
+    ]
+  };
 
   const milestones = [
     "Introduce yourself for 90 seconds: background, interests, and travel plan.",
@@ -343,8 +424,104 @@
     spanish: row[0],
     english: row[1],
     category: row[2],
+    useCase: row[3] || "",
+    slot: row[4] || "",
     source: "phrasebook"
   }));
+
+  const phrasebookExtensions = [
+    ["¿Podría ayudarme con esto, por favor?", "Could you help me with this, please?", "Essentials", "Polite help request"],
+    ["Solo necesito confirmar una cosa.", "I just need to confirm one thing.", "Essentials", "Buying time"],
+    ["Perdón, todavía estoy aprendiendo.", "Sorry, I am still learning.", "Repair", "Softening a mistake"],
+    ["¿Me lo puede decir de otra manera?", "Can you say it another way?", "Repair", "When repetition is not enough"],
+    ["¿Puede hablar un poco más claro, por favor?", "Can you speak a little more clearly, please?", "Repair", "Listening recovery"],
+    ["No estoy seguro/a de haber entendido.", "I am not sure I understood.", "Repair", "Checking comprehension"],
+    ["Entonces, tengo que ir a…", "So, I need to go to…", "Repair", "Confirming a plan", "place"],
+    ["¿Me puede confirmar la hora?", "Can you confirm the time for me?", "Time", "Checking arrangements"],
+    ["¿Es por la mañana o por la tarde?", "Is it in the morning or afternoon?", "Time", "Avoiding schedule confusion"],
+    ["¿Cuánto tiempo tengo que esperar?", "How long do I need to wait?", "Time", "Delays"],
+    ["Necesito llegar antes de las…", "I need to arrive before…", "Time", "Explaining urgency", "time"],
+    ["¿Sale todos los días?", "Does it leave every day?", "Transport", "Schedules"],
+    ["¿Hay otra ruta más segura?", "Is there another safer route?", "Transport", "Changing route"],
+    ["¿Dónde hago transbordo?", "Where do I transfer?", "Transport", "Connections"],
+    ["¿Puedo cambiar este boleto?", "Can I change this ticket?", "Transport", "Plan changes"],
+    ["¿Me avisa si tengo que bajarme?", "Can you let me know if I need to get off?", "Transport", "Onboard help"],
+    ["¿Qué pasa si pierdo la conexión?", "What happens if I miss the connection?", "Transport", "Disruption"],
+    ["¿Hay asientos disponibles para hoy?", "Are there seats available for today?", "Transport", "Same-day travel"],
+    ["¿Puedo ver la habitación primero?", "Can I see the room first?", "Accommodation", "Before accepting a room"],
+    ["La habitación no es la que reservé.", "The room is not the one I booked.", "Accommodation", "Mismatched booking"],
+    ["¿Hay un lugar más tranquilo?", "Is there a quieter place?", "Accommodation", "Comfort request"],
+    ["¿Puede arreglarse hoy?", "Can it be fixed today?", "Accommodation", "Maintenance"],
+    ["¿Me puede dar la confirmación por escrito?", "Can you give me the confirmation in writing?", "Accommodation", "Protecting details"],
+    ["¿Hay algún cargo adicional?", "Is there any extra charge?", "Accommodation", "Avoiding surprise fees"],
+    ["¿Puedo dejar una copia de mi pasaporte?", "Can I leave a copy of my passport?", "Accommodation", "Document boundaries"],
+    ["¿Qué me recomienda si no como carne?", "What do you recommend if I do not eat meat?", "Food", "Dietary needs"],
+    ["¿Se puede hacer menos picante?", "Can it be made less spicy?", "Food", "Adjusting food"],
+    ["¿Este plato se comparte?", "Is this dish shared?", "Food", "Understanding portions"],
+    ["¿Me puede traer otra servilleta?", "Can you bring me another napkin?", "Food", "Small requests"],
+    ["Creo que falta algo de mi pedido.", "I think something is missing from my order.", "Food", "Fixing an order"],
+    ["¿Puedo pedirlo para llevar después?", "Can I ask for it to go afterwards?", "Food", "Leftovers"],
+    ["¿Cuál es la opción más sencilla?", "What is the simplest option?", "Food", "Reducing complexity"],
+    ["¿Cuál es el límite de retiro?", "What is the withdrawal limit?", "Money", "ATM planning"],
+    ["El pago aparece duplicado.", "The payment appears twice.", "Money", "Card problem"],
+    ["¿Puedo probar con otra tarjeta?", "Can I try with another card?", "Money", "Payment recovery"],
+    ["¿Me puede escribir el total?", "Can you write down the total for me?", "Money", "Confirming amount"],
+    ["Necesito billetes más pequeños.", "I need smaller bills.", "Money", "Getting change"],
+    ["¿Este precio incluye impuestos?", "Does this price include taxes?", "Money", "Final price"],
+    ["¿Hay descuento si pago en efectivo?", "Is there a discount if I pay in cash?", "Money", "Negotiating politely"],
+    ["Estoy perdido/a y necesito volver a…", "I am lost and need to get back to…", "Directions", "Getting oriented", "place"],
+    ["¿Cuál es una referencia cercana?", "What is a nearby landmark?", "Directions", "Finding landmarks"],
+    ["¿Camino o tomo transporte?", "Should I walk or take transport?", "Directions", "Choosing route"],
+    ["¿Me puede marcar el lugar aquí?", "Can you mark the place here?", "Directions", "Map support"],
+    ["¿Es mejor ir por esta calle?", "Is it better to go by this street?", "Directions", "Route checking"],
+    ["¿La entrada está por aquí?", "Is the entrance this way?", "Directions", "Final approach"],
+    ["¿Hay wifi disponible para clientes?", "Is Wi-Fi available for customers?", "Connectivity", "Access"],
+    ["Necesito hacer una llamada breve.", "I need to make a short call.", "Connectivity", "Urgent call"],
+    ["¿Puede reiniciar la configuración?", "Can you reset the settings?", "Connectivity", "Troubleshooting"],
+    ["¿Cuándo vence este plan?", "When does this plan expire?", "Connectivity", "Data package"],
+    ["Quisiera una recarga pequeña.", "I would like a small top-up.", "Connectivity", "Phone credit"],
+    ["Tengo dolor de estómago.", "I have stomach pain.", "Health", "Specific symptom"],
+    ["Me siento mareado/a.", "I feel dizzy.", "Health", "Specific symptom"],
+    ["¿Es grave?", "Is it serious?", "Health", "Clarifying risk"],
+    ["¿Debo tomarlo con comida?", "Should I take it with food?", "Health", "Medicine instructions"],
+    ["¿Puedo viajar después de tomar esto?", "Can I travel after taking this?", "Health", "Travel impact"],
+    ["¿Qué hago si empeora?", "What should I do if it gets worse?", "Health", "Safety net"],
+    ["Necesito ayuda, pero no es una emergencia.", "I need help, but it is not an emergency.", "Safety", "Non-urgent help"],
+    ["No quiero ir por una zona peligrosa.", "I do not want to go through a dangerous area.", "Safety", "Route safety"],
+    ["¿Puede acompañarme hasta la entrada?", "Can you accompany me to the entrance?", "Safety", "Getting support"],
+    ["¿Dónde puedo esperar con seguridad?", "Where can I wait safely?", "Safety", "Waiting safely"],
+    ["Prefiero tomar un taxi autorizado.", "I prefer to take an authorised taxi.", "Safety", "Transport choice"],
+    ["Mi documento fue robado.", "My document was stolen.", "Emergency", "Document loss"],
+    ["Necesito hacer una denuncia.", "I need to file a report.", "Emergency", "Police report"],
+    ["¿Puede contactar a mi alojamiento?", "Can you contact my accommodation?", "Emergency", "Getting help"],
+    ["Hay una persona herida.", "There is an injured person.", "Emergency", "Urgent description"],
+    ["Estamos cerca de…", "We are near…", "Emergency", "Location support", "landmark"],
+    ["Voy a visitar varias ciudades.", "I am going to visit several cities.", "Border", "Route explanation"],
+    ["Tengo una reserva para esta noche.", "I have a reservation for tonight.", "Border", "Accommodation proof"],
+    ["Mi próximo destino es…", "My next destination is…", "Border", "Onward travel", "place"],
+    ["Tengo seguro de viaje.", "I have travel insurance.", "Border", "Supporting detail"],
+    ["No voy a trabajar durante mi visita.", "I am not going to work during my visit.", "Border", "Purpose clarification"],
+    ["¿Dónde puedo esperar el equipaje?", "Where can I wait for the luggage?", "Airport", "Baggage delay"],
+    ["Mi conexión sale pronto.", "My connection leaves soon.", "Airport", "Time pressure"],
+    ["¿Puede ponerme en lista de espera?", "Can you put me on the waiting list?", "Airport", "Flight disruption"],
+    ["¿Hay compensación por el retraso?", "Is there compensation for the delay?", "Airport", "Delay rights"],
+    ["¿A quién debo preguntar en la puerta?", "Who should I ask at the gate?", "Airport", "Finding help"],
+    ["¿Le apetece tomar un café?", "Would you like to have a coffee?", "Conversation", "Social invitation"],
+    ["¿Cuánto tiempo lleva viviendo aquí?", "How long have you lived here?", "Conversation", "Follow-up question"],
+    ["Me interesa conocer lugares menos turísticos.", "I am interested in visiting less touristy places.", "Conversation", "Preference"],
+    ["¿Qué haría usted si tuviera solo un día?", "What would you do if you had only one day?", "Conversation", "Recommendation"],
+    ["Gracias, lo voy a tener en cuenta.", "Thanks, I will keep that in mind.", "Conversation", "Closing naturally"]
+  ];
+
+  phrasebook.push(...phrasebookExtensions.map((row, index) => ({
+    id: `phrasebook-${phrasebook.length + index + 1}`,
+    spanish: row[0],
+    english: row[1],
+    category: row[2],
+    useCase: row[3] || "",
+    slot: row[4] || "",
+    source: "phrasebook"
+  })));
 
   const starterDeckIds = [
     "phrasebook-1", "phrasebook-2", "phrasebook-5", "phrasebook-8",
@@ -625,6 +802,44 @@
     }
   ];
 
+  const speakingConstraintSets = [
+    [
+      "First answer slowly, then repeat it with fewer pauses.",
+      "Use one repair phrase instead of stopping when a word is missing.",
+      "Ask one natural follow-up question before you finish.",
+      "Personalise the answer with a real place, date, price, or need."
+    ],
+    [
+      "Include a clear reason with porque and a contrast with pero.",
+      "Use at least one past event and one future plan.",
+      "Give a simple version first, then a more detailed version.",
+      "Finish by checking or confirming what the other person understood."
+    ],
+    [
+      "Speak for ninety seconds without restarting a sentence.",
+      "Play both roles and make the second speaker disagree or hesitate.",
+      "Use a polite opening, a direct request, and a natural closing.",
+      "Repeat the task as if the other person were speaking quickly."
+    ],
+    [
+      "Complete the task without looking at phrase support on the first pass.",
+      "Add an unexpected problem and propose two possible solutions.",
+      "Use three linking words to keep the response moving.",
+      "Do a final thirty-second version containing only the essential information."
+    ]
+  ];
+
+  const speakingFamilies = [
+    "Personal story", "Self-talk", "Planning", "Roleplay", "Listening response",
+    "Problem solving", "Health", "Route talk", "Comparison", "Storytelling",
+    "Preferences", "Social conversation"
+  ];
+
+  speakingExercises.forEach((exercise, index) => {
+    exercise.family = speakingFamilies[index % speakingFamilies.length];
+    exercise.constraints = speakingConstraintSets[index % speakingConstraintSets.length];
+  });
+
   const scenarios = [
     {
       id: "hostel",
@@ -847,6 +1062,67 @@
       roleplay: "A deposit has not been returned and staff say it may take several days. Ask for written confirmation and a receipt."
     }
   ];
+
+  function buildScenarioVariants(scenario) {
+    return [
+      {
+        level: 1,
+        title: "Survival pass",
+        instruction: "Complete the essential exchange clearly. Phrase support is available after your first attempt.",
+        cues: scenario.cues,
+        complication: scenario.roleplay
+      },
+      {
+        level: 2,
+        title: "Realistic response",
+        instruction: "Keep the exchange going after an unexpected answer. Ask one follow-up and confirm the final arrangement.",
+        cues: [
+          ...scenario.cues,
+          "Ask one follow-up question and confirm what will happen next."
+        ],
+        complication: `${scenario.roleplay} The first answer is incomplete, so ask a specific follow-up before accepting it.`
+      },
+      {
+        level: 3,
+        title: "Pressure test",
+        instruction: "Add time, money, availability, or safety pressure. Stay polite and propose an alternative.",
+        cues: [
+          scenario.cues[0],
+          scenario.cues[1],
+          "Explain why the situation is urgent or important.",
+          "Compare two options and choose one clearly."
+        ],
+        complication: `${scenario.roleplay} Your preferred option is unavailable or more expensive than expected.`
+      },
+      {
+        level: 4,
+        title: "Regional route pass",
+        instruction: "Use a country from your route. Expect one unfamiliar local word and recover without abandoning the exchange.",
+        cues: [
+          ...scenario.cues,
+          "Ask what one unfamiliar local word means.",
+          "Repeat the final arrangement back in clear, neutral Spanish."
+        ],
+        complication: `${scenario.roleplay} The other speaker uses a regional word or expression you do not recognise immediately.`
+      },
+      {
+        level: 5,
+        title: "Travel-ready simulation",
+        instruction: "Complete the whole exchange without notes, then repeat a concise version containing only the essential information.",
+        cues: [
+          scenario.cues[0],
+          "Handle the main request and one unexpected problem without opening support.",
+          "Confirm the result, next step, price, time, or location.",
+          "Close the exchange naturally and politely."
+        ],
+        complication: `${scenario.roleplay} Resolve it in at least four turns per role, then give a thirty-second summary without notes.`
+      }
+    ];
+  }
+
+  scenarios.forEach((scenario) => {
+    scenario.variants = buildScenarioVariants(scenario);
+  });
 
   const listeningLadder = [
     {
@@ -1080,37 +1356,204 @@
     ]
   };
 
-  const read2SpeakCheckpoints = [
-    ["ebook-introduction", "Study the eBook introduction", "Read what the unit teaches and note the communication goal.", "ebook"],
-    ["ebook-grammar", "Study the eBook explanation", "Work through the main explanation slowly and write down anything unclear.", "ebook"],
-    ["ebook-vocabulary", "Study vocabulary and structures", "Say useful items aloud and mark the ones you want to retrieve while travelling.", "ebook"],
-    ["ebook-examples", "Read examples aloud", "Notice the pattern in context instead of memorising an isolated rule.", "ebook"],
-    ["ebook-dialogue", "Read the dialogue or text aloud", "Read for meaning, then repeat for rhythm and speaking activation.", "ebook"],
-    ["ebook-practice", "Complete the eBook practice", "Attempt the unit’s eBook practice before moving to the separate workbook.", "ebook"],
-    ["ebook-review", "Check the eBook answers and conclusion", "Correct your work, review the key takeaways, and carry useful items into the workbook.", "ebook"],
-    ["workbook-1-8", "Complete workbook exercises 1–8", "Start with the most guided practice and write your answers out.", "workbook"],
-    ["workbook-9-16", "Complete workbook exercises 9–16", "Continue in order without checking the answer key early.", "workbook"],
-    ["workbook-17-25", "Complete workbook exercises 17–25", "Finish the more independent production and conversation work.", "workbook"],
-    ["workbook-answers", "Check the workbook answer key", "Correct each mistake and note why the corrected form works.", "workbook"],
-    ["review-retry", "Review and retry weak work", "Return to the relevant eBook section, then retry difficult workbook items.", "review"],
-    ["speaking-activation", "Activate the unit aloud", "Give a short original response using the unit’s broad communication skill.", "speak"],
-    ["unit-review", "Complete the unit review", "Rate your confidence and schedule a return visit if retrieval is still slow.", "review"]
-  ].map((row) => ({ id: row[0], title: row[1], detail: row[2], resource: row[3] }));
+  const read2SpeakSessionBlueprints = [
+    {
+      id: "ebook-1",
+      title: "Learn the goal and begin the explanation",
+      resource: "ebook",
+      ebookPart: 0,
+      learn: "Study the unit goal and the first small section of explanation.",
+      retrieve: "Close the PDF and explain the communication goal in your own words.",
+      produce: "Write or say three original examples connected to your trip."
+    },
+    {
+      id: "ebook-2",
+      title: "Build the first pattern",
+      resource: "ebook",
+      ebookPart: 1,
+      learn: "Study the next explanation chunk and its key examples.",
+      retrieve: "Recall the pattern and one contrast without looking.",
+      produce: "Create three new examples, including one question."
+    },
+    {
+      id: "ebook-3",
+      title: "Extend the pattern",
+      resource: "ebook",
+      ebookPart: 2,
+      learn: "Continue through the next focused explanation chunk.",
+      retrieve: "State when you would use the structure in a real conversation.",
+      produce: "Answer a realistic travel prompt using the structure twice."
+    },
+    {
+      id: "ebook-4",
+      title: "Use the explanation actively",
+      resource: "ebook",
+      ebookPart: 3,
+      learn: "Study the next pages, including examples or contrasts.",
+      retrieve: "Reconstruct the hardest example from memory.",
+      produce: "Rewrite three examples with a destination, time, price, or personal need."
+    },
+    {
+      id: "ebook-5",
+      title: "Activate vocabulary and structures",
+      resource: "ebook",
+      ebookPart: 4,
+      learn: "Study the next vocabulary or structure-rich pages.",
+      retrieve: "Recall five useful items before checking the page.",
+      produce: "Use three recalled items in connected sentences."
+    },
+    {
+      id: "ebook-6",
+      title: "Read examples for meaning",
+      resource: "ebook",
+      ebookPart: 5,
+      learn: "Read the next examples or text aloud for meaning and rhythm.",
+      retrieve: "Summarise the main idea without translating sentence by sentence.",
+      produce: "Give a short response that copies the useful pattern, not the wording."
+    },
+    {
+      id: "ebook-7",
+      title: "Work with the dialogue or text",
+      resource: "ebook",
+      ebookPart: 6,
+      learn: "Finish the unit input, dialogue, or analysed text.",
+      retrieve: "Close the PDF and reconstruct the sequence or argument.",
+      produce: "Perform or retell it with one realistic change."
+    },
+    {
+      id: "ebook-8",
+      title: "Complete eBook practice and consolidate",
+      resource: "ebook",
+      ebookPart: 7,
+      learn: "Complete the remaining eBook practice and review the conclusion.",
+      retrieve: "List three takeaways and one point that is still uncertain.",
+      produce: "Correct one weak answer and give a fresh example aloud."
+    },
+    {
+      id: "workbook-1",
+      title: "Workbook exercises 1–4",
+      resource: "workbook",
+      exerciseStart: 1,
+      exerciseEnd: 4,
+      workbookPart: 0
+    },
+    {
+      id: "workbook-2",
+      title: "Workbook exercises 5–8",
+      resource: "workbook",
+      exerciseStart: 5,
+      exerciseEnd: 8,
+      workbookPart: 1
+    },
+    {
+      id: "workbook-3",
+      title: "Workbook exercises 9–12",
+      resource: "workbook",
+      exerciseStart: 9,
+      exerciseEnd: 12,
+      workbookPart: 2
+    },
+    {
+      id: "workbook-4",
+      title: "Workbook exercises 13–16",
+      resource: "workbook",
+      exerciseStart: 13,
+      exerciseEnd: 16,
+      workbookPart: 3
+    },
+    {
+      id: "workbook-5",
+      title: "Workbook exercises 17–20",
+      resource: "workbook",
+      exerciseStart: 17,
+      exerciseEnd: 20,
+      workbookPart: 4
+    },
+    {
+      id: "workbook-6",
+      title: "Workbook exercises 21–25",
+      resource: "workbook",
+      exerciseStart: 21,
+      exerciseEnd: 25,
+      workbookPart: 5
+    },
+    {
+      id: "correct-retry",
+      title: "Check, explain, and retry",
+      resource: "workbook",
+      workbookPart: 6,
+      learn: "Check only the workbook work you have already attempted.",
+      retrieve: "Before reading each explanation, say why you think the answer works.",
+      produce: "Correct mistakes in full and retry the two weakest items without help."
+    },
+    {
+      id: "activate-review",
+      title: "Activate the unit and schedule review",
+      resource: "review",
+      learn: "Scan your notes and choose the unit’s most useful communication skill.",
+      retrieve: "Recall five useful forms or phrases without opening either PDF.",
+      produce: "Give a two-minute original response, then repeat a shorter travel-ready version."
+    }
+  ];
+
+  function splitPageRange(startPage, endPage, parts, index) {
+    const pageCount = Math.max(1, endPage - startPage + 1);
+    const start = startPage + Math.floor((pageCount * index) / parts);
+    const end = startPage + Math.floor((pageCount * (index + 1)) / parts) - 1;
+    return { startPage: start, endPage: Math.max(start, end) };
+  }
+
+  function buildRead2SpeakSessions(unit) {
+    const workbookOffsets = [0, 0.12, 0.23, 0.34, 0.45, 0.56, 0.7];
+    const workbookPages = Math.max(1, unit.workbook.endPage - unit.workbook.startPage + 1);
+    return read2SpeakSessionBlueprints.map((blueprint, index) => {
+      const session = {
+        ...blueprint,
+        number: index + 1,
+        minutes: 15,
+        capture: "Save one useful phrase or note one mistake to revisit.",
+        latinAmerica: "Mark Spain-only forms or vocabulary and note a neutral or route-country alternative."
+      };
+      if (Number.isInteger(blueprint.ebookPart)) {
+        Object.assign(session, splitPageRange(
+          unit.ebook.startPage,
+          unit.ebook.endPage,
+          8,
+          blueprint.ebookPart
+        ));
+      }
+      if (Number.isInteger(blueprint.workbookPart)) {
+        session.startPage = unit.workbook.startPage +
+          Math.floor(workbookPages * workbookOffsets[blueprint.workbookPart]);
+        session.endPage = unit.workbook.endPage;
+        if (blueprint.exerciseStart) {
+          session.learn = `Complete exercises ${blueprint.exerciseStart}–${blueprint.exerciseEnd} in order. Stop after 15 minutes if an exercise needs more thought.`;
+          session.retrieve = "Before checking anything, explain the rule or communication choice behind two answers.";
+          session.produce = "Read two completed answers aloud and personalise one for travel.";
+        }
+      }
+      return session;
+    });
+  }
 
   function buildRead2SpeakUnits(titles, workbookStarts, ebookStarts, workbookPages, ebookPages, mismatches = {}) {
-    return titles.map((title, index) => ({
-      number: index + 1,
-      title,
-      workbook: {
+    return titles.map((title, index) => {
+      const unit = {
+        number: index + 1,
+        title,
+        workbook: {
         startPage: workbookStarts[index],
         endPage: (workbookStarts[index + 1] || workbookPages + 1) - 1
-      },
-      ebook: {
-        startPage: ebookStarts[index],
-        endPage: (ebookStarts[index + 1] || ebookPages + 1) - 1
-      },
-      alignment: mismatches[index + 1] || ""
-    }));
+        },
+        ebook: {
+          startPage: ebookStarts[index],
+          endPage: (ebookStarts[index + 1] || ebookPages + 1) - 1
+        },
+        alignment: mismatches[index + 1] || ""
+      };
+      unit.sessions = buildRead2SpeakSessions(unit);
+      return unit;
+    });
   }
 
   const read2SpeakCourses = [
@@ -1225,11 +1668,39 @@
       const dayOfWeek = index % 7;
       const month = Math.min(12, Math.floor(index / (364 / 12)) + 1);
       const phase = phases[month - 1];
+      const weekStartIndex = Math.floor(index / 7) * 7;
+      const weekMonth = Math.min(12, Math.floor(weekStartIndex / (364 / 12)) + 1);
+      const scenarioPhase = phases[weekMonth - 1];
       const pattern = dayPatterns[dayOfWeek];
       const theme = weeklyThemes[Math.floor((week - 1) / 4) % weeklyThemes.length];
       const isCheckIn = dayOfWeek === 6;
       const isMilestone = day === Math.min(364, Math.round(month * (364 / 12)));
-      const targetMinutes = [35, 40, 45, 45, 50, 35, 30][dayOfWeek] + Math.min(15, Math.floor((month - 1) / 3) * 5);
+      const targetMinutes = [40, 45, 50, 50, 55, 40, 35][dayOfWeek] + Math.min(15, Math.floor((month - 1) / 3) * 5);
+      const readMinutes = 15;
+      const remainingMinutes = targetMinutes - readMinutes;
+      const listenMinutes = Math.round(remainingMinutes * 0.35);
+      const speakMinutes = Math.round(remainingMinutes * 0.28);
+      const reviewMinutes = Math.round(remainingMinutes * 0.2);
+      const travelMinutes = remainingMinutes - listenMinutes - speakMinutes - reviewMinutes;
+      const scenarioId = scenarioPhase.scenarioIds[(week - 1) % scenarioPhase.scenarioIds.length];
+      const scenario = scenarios.find((item) => item.id === scenarioId);
+      const scenarioTitle = scenario?.title || "this week’s scenario";
+      const diagnostic = weeklyDiagnostics[week - 1];
+      const microFocus = Object.fromEntries(
+        Object.entries(checklistVariants).map(([taskType, variants]) => [
+          taskType,
+          variants[(week + dayOfWeek - 2 + variants.length) % variants.length]
+        ])
+      );
+      const travelDetails = [
+        `Open ${scenarioTitle} in the app and preview Key vocabulary under Reveal phrase support.`,
+        `Open ${scenarioTitle} in the app and practise two polite questions from its Useful phrases.`,
+        `Open ${scenarioTitle} in the app, review its phrase support, then notice those words in today’s listening.`,
+        `Complete ${scenarioTitle} in the app and rate your confidence.`,
+        `Open ${scenarioTitle} in the app and personalise the roleplay with a destination, price, time, or need from your trip.`,
+        `On Linguno, solve a crossword at your level and choose a travel theme when available. Then use StudySpanish Travel Helper for the ${scenarioTitle} theme.`,
+        pattern.travel
+      ];
 
       return {
         id: `day-${day}`,
@@ -1247,42 +1718,45 @@
             id: "read",
             type: "read",
             title: "Read2Speak / StudySpanish",
-            detail: addStudySpanishGuidance(dayOfWeek, "read", pattern.read, phase),
-            minutes: Math.round(targetMinutes * 0.28)
+            detail: `${addStudySpanishGuidance(dayOfWeek, "read", pattern.read, phase)} ${microFocus.read}`,
+            minutes: readMinutes
           },
           {
             id: "listen",
             type: "listen",
             title: "Listening",
-            detail: addStudySpanishGuidance(dayOfWeek, "listen", `Stage ${phase.listeningStage}: ${pattern.listen}`, phase),
-            minutes: Math.round(targetMinutes * 0.25)
+            detail: `${addStudySpanishGuidance(dayOfWeek, "listen", `Stage ${phase.listeningStage}: ${pattern.listen}`, phase)} ${microFocus.listen}`,
+            minutes: listenMinutes
           },
           {
             id: "speak",
             type: "speak",
             title: "Speaking",
-            detail: pattern.speak,
-            minutes: Math.round(targetMinutes * 0.2)
+            detail: `${pattern.speak} ${microFocus.speak}`,
+            minutes: speakMinutes
           },
           {
             id: "review",
             type: "review",
             title: "Vocab, grammar and phrase review",
-            detail: addStudySpanishGuidance(dayOfWeek, "review", pattern.review, phase),
-            minutes: Math.round(targetMinutes * 0.15)
+            detail: `${addStudySpanishGuidance(dayOfWeek, "review", pattern.review, phase)} ${microFocus.review}`,
+            minutes: reviewMinutes
           },
           {
             id: "travel",
             type: "travel",
             title: isCheckIn ? "Weekly diagnostic" : (isMilestone ? "Monthly milestone" : "Travel practice"),
-            detail: addStudySpanishGuidance(dayOfWeek, "travel", isCheckIn
-              ? weeklyCheckIns[(week - 1) % weeklyCheckIns.length]
-              : (isMilestone ? milestones[month - 1].task : pattern.travel), phase),
-            minutes: Math.max(5, Math.round(targetMinutes * 0.12))
+            detail: isCheckIn
+              ? `${diagnostic.type}: ${diagnostic.task} Reflection: ${diagnostic.reflection}`
+              : `${isMilestone ? milestones[month - 1].task : travelDetails[dayOfWeek]} ${microFocus.travel}`,
+            minutes: travelMinutes
           }
         ],
-        checkIn: isCheckIn ? weeklyCheckIns[(week - 1) % weeklyCheckIns.length] : "",
+        checkIn: isCheckIn ? weeklyCheckIns[week - 1] : "",
+        diagnostic: isCheckIn ? diagnostic : null,
+        microFocus,
         milestone: isMilestone ? milestones[month - 1] : null,
+        scenarioId,
         scenarioIds: phase.scenarioIds,
         listeningStage: phase.listeningStage
       };
@@ -1293,6 +1767,7 @@
     phases,
     dailyTasks: buildDailyTasks(),
     weeklyCheckIns,
+    weeklyDiagnostics,
     milestones,
     phrasebook,
     starterDeckIds,
@@ -1305,7 +1780,7 @@
     resources,
     languageTransferCourse,
     read2SpeakCourses,
-    read2SpeakCheckpoints,
+    read2SpeakSessionBlueprints,
     countries: Object.keys(regionalNotes)
   };
 })();
